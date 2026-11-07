@@ -1,0 +1,55 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="theme-color" content="#101914" />
+  <title>Blockverse — Voxel Survival</title>
+  <link rel="stylesheet" href="./src/style.css" />
+  <script type="importmap">
+    { "imports": { "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js" } }
+  </script>
+</head>
+<body>
+  <div id="game">
+    <div id="topbar">
+      <div class="brand"><span class="brand-mark">B</span><span>BLOCKVERSE</span><small>EARLY BUILD 0.1</small></div>
+      <div class="top-status"><span class="status-dot"></span> MUNDO LOCAL <span id="coords">X 0 · Y 0 · Z 0</span></div>
+      <button id="menu-button" class="icon-button" aria-label="Abrir menu">☰</button>
+    </div>
+    <div id="crosshair"><i></i><b></b></div>
+    <div id="toast"></div>
+    <div id="hint">Clique para jogar <span>WASD mover · Espaço pular · Mouse olhar</span></div>
+    <div id="left-info"><div class="info-label">BIOMA</div><strong>Campos verdes</strong><div class="weather"><span></span> Céu limpo</div></div>
+    <div id="right-info"><div class="info-label">ESTADO DO MUNDO</div><strong id="clock">08:00</strong><div id="day-label">Dia 1</div></div>
+    <div id="hotbar" aria-label="Barra rápida"></div>
+    <div id="helpbar"><span><kbd>W A S D</kbd> Mover</span><span><kbd>ESPAÇO</kbd> Pular</span><span><kbd>ESQ</kbd> Minerar</span><span><kbd>DIR</kbd> Colocar</span><span><kbd>1–6</kbd> Itens</span><span><kbd>ESC</kbd> Menu</span></div>
+    <div id="menu-overlay" class="overlay hidden">
+      <section class="panel">
+        <div class="panel-kicker">BLOCKVERSE / PAUSADO</div>
+        <h1 id="menu-title">Pausa no mundo</h1>
+        <p id="menu-description">Respire. O mundo continua esperando por você.</p>
+        <button id="resume" class="primary-button">Continuar jogando <span>→</span></button>
+        <div class="settings">
+          <label for="sensitivity">Sensibilidade do mouse <output id="sensitivity-value">0.75</output></label>
+          <input id="sensitivity" type="range" min="0.2" max="2" step="0.05" value="0.75" />
+          <label for="render-distance">Distância de visão <output id="distance-value">5 chunks</output></label>
+          <input id="render-distance" type="range" min="2" max="8" step="1" value="5" />
+        </div>
+        <div class="panel-foot">BLOCKVERSE · UM MUNDO FEITO DE BLOCOS</div>
+      </section>
+    </div>
+    <div id="start-overlay" class="overlay">
+      <section class="start-card">
+        <div class="start-logo">B</div>
+        <div class="panel-kicker">UM NOVO MUNDO AGUARDA</div>
+        <h1>BLOCK<span>VERSE</span></h1>
+        <p>Explore. Construa. Descubra.</p>
+        <button id="start-button" class="primary-button">Entrar no mundo <span>→</span></button>
+        <div class="start-meta">MODO CRIATIVO · MUNDO PROCEDURAL · BUILD 0.1</div>
+      </section>
+    </div>
+  </div>
+  <script type="module" src="./src/main.js"></script>
+</body>
+</html>
