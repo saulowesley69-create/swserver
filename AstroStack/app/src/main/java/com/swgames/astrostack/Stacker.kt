@@ -247,6 +247,14 @@ class DarkBuilder(val w: Int, val h: Int, val exposureNs: Long, val iso: Int) {
         for (i in 0 until w * h) {
             sr[i] *= inv; sg[i] *= inv; sb[i] *= inv
         }
+        // Guarda só o PADRÃO do dark (sem o nível de preto), pra não jogar o céu abaixo de zero
+        for (a in listOf(sr, sg, sb)) {
+            val step = max(1, a.size / 50000)
+            val smp = FloatArray(a.size / step) { a[it * step] }
+            smp.sort()
+            val med = smp[smp.size / 2]
+            for (i in a.indices) a[i] -= med
+        }
         return MasterDark(w, h, sr, sg, sb, exposureNs, iso, count)
     }
 }
@@ -463,29 +471,51 @@ class Stacker(val w: Int, val h: Int, private val dark: MasterDark?) {
         val dr = boxBlur(boxBlur(FloatArray(n) { rr[it] - lum[it] }, dw, dh, cr), dw, dh, cr)
         val dg = boxBlur(boxBlur(FloatArray(n) { gg[it] - lum[it] }, dw, dh, cr), dw, dh, cr)
         val db = boxBlur(boxBlur(FloatArray(n) { bb[it] - lum[it] }, dw, dh, cr), dw, dh, cr)
+        // ruído do brilho: mistura 50% com uma versão levemente borrada
+        val lumSoft = boxBlur(lum, dw, dh, 1)
+        for (i in 0 until n) lum[i] = 0.5f * lum[i] + 0.5f * lumSoft[i]
         for (i in 0 until n) {
             rr[i] = lum[i] + dr[i]; gg[i] = lum[i] + dg[i]; bb[i] = lum[i] + db[i]
         }
 
-        // Realce estilo Siril: o fundo do céu vai pra um cinza escuro fixo,
-        // em vez de esticar até a estrela mais forte (que estourava o ruído).
-        val target = 0.06f + strength / 100f * 0.24f
-        val lr = Levels.of(rr, target)
-        val lg = Levels.of(gg, target)
-        val lb = Levels.of(bb, target)
+        // Fundo neutro: iguala a mediana dos 3 canais (tira o tom verde/roxo do céu)
+        val medR = median(rr, good)
+        val medG = median(gg, good)
+        val medB = median(bb, good)
+        val medAll = (medR + medG + medB) / 3f
+        for (i in 0 until n) {
+            rr[i] += medAll - medR; gg[i] += medAll - medG; bb[i] += medAll - medB
+            // SCNR (média neutra), no dado linear: verde não passa da média de vermelho e azul
+            gg[i] = min(gg[i], (rr[i] + bb[i]) * 0.5f)
+        }
+
+        // Realce estilo Siril: o fundo do céu vai pra um cinza escuro fixo.
+        // O MESMO ajuste vale pros 3 canais, senão o ruído vira pontinho colorido.
+        val target = 0.04f + strength / 100f * 0.20f
+        val lumAll = FloatArray(n) { (rr[it] + gg[it] + bb[it]) / 3f }
+        val lv = Levels.of(lumAll, target)
         val px = IntArray(n)
         for (i in 0 until n) {
             if (!good[i]) { px[i] = 0xFF000000.toInt(); continue }
-            val r = lr.apply(rr[i])
-            val b = lb.apply(bb[i])
-            // SCNR: verde nunca passa da média de vermelho e azul
-            val g = min(lg.apply(gg[i]), (r + b) / 2)
+            val r = lv.apply(rr[i])
+            val g = lv.apply(gg[i])
+            val b = lv.apply(bb[i])
             px[i] = (0xFF shl 24) or (r shl 16) or (g shl 8) or b
         }
         return RenderedImage(dw, dh, px)
     }
 
-    /** Ponto preto + curva de meios-tons (MTF) de um canal. */
+    private fun median(a: FloatArray, good: BooleanArray): Float {
+        val vals = ArrayList<Float>()
+        val step = max(1, a.size / 50000)
+        var i = 0
+        while (i < a.size) { if (good[i]) vals.add(a[i]); i += step }
+        if (vals.isEmpty()) return 0f
+        vals.sort()
+        return vals[vals.size / 2]
+    }
+
+    /** Ponto preto + curva de meios-tons (MTF). */
     private class Levels(val black: Float, val range: Float, val m: Float) {
         fun apply(v: Float): Int {
             val x = ((v - black) / range).coerceIn(0f, 1f)
@@ -503,7 +533,7 @@ class Stacker(val w: Int, val h: Int, private val dark: MasterDark?) {
                 for (k in 0 until n) s[k] = abs(s[k] - med)
                 s.sort()
                 val sigma = max(1.4826f * s[n / 2], 0.3f)
-                val black = max(0f, med - 2.8f * sigma)
+                val black = med - 2.8f * sigma
                 val range = max(255f - black, 1f)
                 val bn = ((med - black) / range).coerceIn(1e-4f, 0.99f)
                 // m que leva o fundo (bn) até o alvo

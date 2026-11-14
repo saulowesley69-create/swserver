@@ -11,8 +11,8 @@ android {
         applicationId 'com.swgames.astrostack'
         minSdk 29
         targetSdk 34
-        versionCode 4
-        versionName '0.4'
+        versionCode 5
+        versionName '0.4.1'
     }
 
     // Chave fixa: assim cada APK novo instala por cima do antigo, sem desinstalar.
