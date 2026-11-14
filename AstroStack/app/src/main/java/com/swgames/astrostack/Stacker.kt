@@ -276,11 +276,22 @@ class Stacker(val w: Int, val h: Int) {
         val inv = 1f / rawFrames
         val lim = 2f * sigma
         val n = w * h
+        val starThr = 1.5f * sigma
         val mean = FloatArray(n)
+        val clipped = FloatArray(n)
         for ((u, target) in listOf(Pair(ur, f.r), Pair(ug, f.g), Pair(ub, f.b))) {
             for (i in 0 until n) mean[i] = u[i] * inv
-            val blur = boxBlur(mean, w, h, 10)
-            for (i in 0 until n) target[i] -= (mean[i] - blur[i]).coerceIn(-lim, lim)
+            // 1ª passada: fundo aproximado. Tudo que passa dele é estrela, não sensor.
+            val blur1 = boxBlur(mean, w, h, 10)
+            for (i in 0 until n) clipped[i] = min(mean[i], blur1[i] + starThr)
+            // 2ª passada: fundo sem as estrelas (evita o quadrado claro em volta delas)
+            val blur2 = boxBlur(clipped, w, h, 10)
+            // máscara das estrelas, alargada uns pixels pra proteger as bordas delas
+            val mask = boxBlur(FloatArray(n) { if (mean[it] > blur1[it] + starThr) 1f else 0f }, w, h, 3)
+            for (i in 0 until n) {
+                if (mask[i] > 0f) continue // estrela: não mexe
+                target[i] -= (clipped[i] - blur2[i]).coerceIn(-lim, lim)
+            }
         }
         for (i in 0 until n) f.lum[i] = 0.299f * f.r[i] + 0.587f * f.g[i] + 0.114f * f.b[i]
     }
@@ -334,6 +345,8 @@ class Stacker(val w: Int, val h: Int) {
         val rr = FloatArray(n)
         val gg = FloatArray(n)
         val bb = FloatArray(n)
+        val good = BooleanArray(n)
+        val minCount = max(1, (stacked * 0.6f).toInt())
         for (y in 0 until dh) {
             for (x in 0 until dw) {
                 var r = 0f
@@ -354,19 +367,29 @@ class Stacker(val w: Int, val h: Int) {
                 if (k > 0) {
                     rr[o] = r / k; gg[o] = g / k; bb[o] = b / k
                 }
+                good[o] = cnt[(y * scale) * w + x * scale] >= minCount
             }
+        }
+        // Bordas com poucas fotos: preenche com o fundo médio (depois vira preto)
+        for (a in listOf(rr, gg, bb)) {
+            val vals = ArrayList<Float>()
+            var i = 0
+            while (i < n) { if (good[i]) vals.add(a[i]); i += 7 }
+            vals.sort()
+            val fill = if (vals.isEmpty()) 0f else vals[vals.size / 2]
+            for (j in 0 until n) if (!good[j]) a[j] = fill
         }
         if (removeGradient) {
             subtractGradient(rr, dw, dh)
             subtractGradient(gg, dw, dh)
             subtractGradient(bb, dw, dh)
         }
-        // Tira o ruído colorido: borra só a cor, mantém o brilho nítido.
-        val cr = max(1, 6 / scale)
+        // Tira o ruído colorido: borra só a cor (2 passadas ≈ gaussiano), mantém o brilho nítido.
+        val cr = max(2, 14 / scale)
         val lum = FloatArray(n) { (rr[it] + gg[it] + bb[it]) / 3f }
-        val dr = boxBlur(FloatArray(n) { rr[it] - lum[it] }, dw, dh, cr)
-        val dg = boxBlur(FloatArray(n) { gg[it] - lum[it] }, dw, dh, cr)
-        val db = boxBlur(FloatArray(n) { bb[it] - lum[it] }, dw, dh, cr)
+        val dr = boxBlur(boxBlur(FloatArray(n) { rr[it] - lum[it] }, dw, dh, cr), dw, dh, cr)
+        val dg = boxBlur(boxBlur(FloatArray(n) { gg[it] - lum[it] }, dw, dh, cr), dw, dh, cr)
+        val db = boxBlur(boxBlur(FloatArray(n) { bb[it] - lum[it] }, dw, dh, cr), dw, dh, cr)
         for (i in 0 until n) {
             rr[i] = lum[i] + dr[i]; gg[i] = lum[i] + dg[i]; bb[i] = lum[i] + db[i]
         }
@@ -379,7 +402,12 @@ class Stacker(val w: Int, val h: Int) {
         val lb = Levels.of(bb, target)
         val px = IntArray(n)
         for (i in 0 until n) {
-            px[i] = (0xFF shl 24) or (lr.apply(rr[i]) shl 16) or (lg.apply(gg[i]) shl 8) or lb.apply(bb[i])
+            if (!good[i]) { px[i] = 0xFF000000.toInt(); continue }
+            val r = lr.apply(rr[i])
+            val b = lb.apply(bb[i])
+            // SCNR: verde nunca passa da média de vermelho e azul
+            val g = min(lg.apply(gg[i]), (r + b) / 2)
+            px[i] = (0xFF shl 24) or (r shl 16) or (g shl 8) or b
         }
         return RenderedImage(dw, dh, px)
     }
