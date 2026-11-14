@@ -7,6 +7,7 @@ import kotlin.math.max
 import kotlin.math.min
 import kotlin.math.roundToInt
 import kotlin.math.sin
+import kotlin.math.sqrt
 
 // Este arquivo é Kotlin puro (sem Android), pra poder ser testado no computador.
 
@@ -221,11 +222,46 @@ object Aligner {
     }
 }
 
-/** A pilha: soma das fotos alinhadas. */
-class Stacker(val w: Int, val h: Int) {
+/** Master dark: média de fotos com a lente tampada (mesma exposição e ISO). */
+class MasterDark(val w: Int, val h: Int, val r: FloatArray, val g: FloatArray, val b: FloatArray,
+                 val exposureNs: Long, val iso: Int, val frames: Int)
+
+class DarkBuilder(val w: Int, val h: Int, val exposureNs: Long, val iso: Int) {
     private val sr = FloatArray(w * h)
     private val sg = FloatArray(w * h)
     private val sb = FloatArray(w * h)
+    var count = 0
+        private set
+
+    fun add(f: Frame) {
+        if (f.w != w || f.h != h) return
+        for (i in 0 until w * h) {
+            sr[i] += f.r[i]; sg[i] += f.g[i]; sb[i] += f.b[i]
+        }
+        count++
+    }
+
+    fun build(): MasterDark? {
+        if (count == 0) return null
+        val inv = 1f / count
+        for (i in 0 until w * h) {
+            sr[i] *= inv; sg[i] *= inv; sb[i] *= inv
+        }
+        return MasterDark(w, h, sr, sg, sb, exposureNs, iso, count)
+    }
+}
+
+/**
+ * A pilha. Guarda média e variância de cada pixel ao vivo (Welford),
+ * e a partir da 3ª foto rejeita o que foge mais de 3σ (avião, satélite, pixel quente).
+ */
+class Stacker(val w: Int, val h: Int, private val dark: MasterDark?) {
+    private val mr = FloatArray(w * h)
+    private val mg = FloatArray(w * h)
+    private val mb = FloatArray(w * h)
+    private val vr = FloatArray(w * h)
+    private val vg = FloatArray(w * h)
+    private val vb = FloatArray(w * h)
     private val cnt = ShortArray(w * h)
     private var refStars: List<Star>? = null
     private var prior = Transform.IDENTITY
@@ -233,24 +269,39 @@ class Stacker(val w: Int, val h: Int) {
         private set
     var lastStarCount = 0
         private set
+    /** % de pixels rejeitados na última foto */
+    var lastRejectedPct = 0f
+        private set
+    val usesDark get() = dark != null
 
-    // Soma das fotos SEM alinhar: as estrelas se espalham, mas o padrão fixo
-    // do sensor fica parado. É isso que causa as listras ("ruído andante").
-    private val ur = FloatArray(w * h)
-    private val ug = FloatArray(w * h)
-    private val ub = FloatArray(w * h)
+    // Sem dark frame: estima o padrão fixo do sensor pela média SEM alinhar.
+    private val ur: FloatArray? = if (dark == null) FloatArray(w * h) else null
+    private val ug: FloatArray? = if (dark == null) FloatArray(w * h) else null
+    private val ub: FloatArray? = if (dark == null) FloatArray(w * h) else null
     private var rawFrames = 0
 
     /** Adiciona uma foto. Retorna false se ela foi rejeitada (não alinhou). */
     fun add(f: Frame): Boolean {
         if (f.w != w || f.h != h) return false
+        val d = dark
+        if (d != null && d.w == w && d.h == h) {
+            for (i in 0 until w * h) {
+                f.r[i] -= d.r[i]; f.g[i] -= d.g[i]; f.b[i] -= d.b[i]
+                f.lum[i] = 0.299f * f.r[i] + 0.587f * f.g[i] + 0.114f * f.b[i]
+            }
+        }
         val (_, sigma) = f.bgStats()
         f.removeHotPixels(sigma)
-        for (i in 0 until w * h) {
-            ur[i] += f.r[i]; ug[i] += f.g[i]; ub[i] += f.b[i]
+        val a = ur
+        val bg = ug
+        val c = ub
+        if (a != null && bg != null && c != null) {
+            for (i in 0 until w * h) {
+                a[i] += f.r[i]; bg[i] += f.g[i]; c[i] += f.b[i]
+            }
+            rawFrames++
+            if (rawFrames >= 3) removeFixedPattern(f, sigma, a, bg, c)
         }
-        rawFrames++
-        if (rawFrames >= 3) removeFixedPattern(f, sigma)
         val stars = StarDetector.detect(f, 80)
         lastStarCount = stars.size
         val ref = refStars
@@ -270,9 +321,9 @@ class Stacker(val w: Int, val h: Int) {
 
     /**
      * Padrão fixo = média sem alinhar − versão borrada dela.
-     * Limitado a ±2σ pra nunca apagar estrela de verdade.
+     * Ignora as estrelas e é limitado a ±2σ pra nunca apagar estrela de verdade.
      */
-    private fun removeFixedPattern(f: Frame, sigma: Float) {
+    private fun removeFixedPattern(f: Frame, sigma: Float, ur: FloatArray, ug: FloatArray, ub: FloatArray) {
         val inv = 1f / rawFrames
         val lim = 2f * sigma
         val n = w * h
@@ -281,15 +332,12 @@ class Stacker(val w: Int, val h: Int) {
         val clipped = FloatArray(n)
         for ((u, target) in listOf(Pair(ur, f.r), Pair(ug, f.g), Pair(ub, f.b))) {
             for (i in 0 until n) mean[i] = u[i] * inv
-            // 1ª passada: fundo aproximado. Tudo que passa dele é estrela, não sensor.
             val blur1 = boxBlur(mean, w, h, 10)
             for (i in 0 until n) clipped[i] = min(mean[i], blur1[i] + starThr)
-            // 2ª passada: fundo sem as estrelas (evita o quadrado claro em volta delas)
             val blur2 = boxBlur(clipped, w, h, 10)
-            // máscara das estrelas, alargada uns pixels pra proteger as bordas delas
             val mask = boxBlur(FloatArray(n) { if (mean[it] > blur1[it] + starThr) 1f else 0f }, w, h, 3)
             for (i in 0 until n) {
-                if (mask[i] > 0f) continue // estrela: não mexe
+                if (mask[i] > 0f) continue
                 target[i] -= (clipped[i] - blur2[i]).coerceIn(-lim, lim)
             }
         }
@@ -301,6 +349,9 @@ class Stacker(val w: Int, val h: Int) {
         val s = t.s
         val maxX = (w - 1).toFloat()
         val maxY = (h - 1).toFloat()
+        val kappa = 3f
+        var rejected = 0L
+        var tested = 0L
         for (y in 0 until h) {
             val dy = y - t.ty
             val dx0 = -t.tx
@@ -320,15 +371,37 @@ class Stacker(val w: Int, val h: Int) {
                     val w11 = fx * fy
                     val i = y0 * w + x0
                     val o = row + x
-                    sr[o] += f.r[i] * w00 + f.r[i + 1] * w10 + f.r[i + w] * w01 + f.r[i + w + 1] * w11
-                    sg[o] += f.g[i] * w00 + f.g[i + 1] * w10 + f.g[i + w] * w01 + f.g[i + w + 1] * w11
-                    sb[o] += f.b[i] * w00 + f.b[i + 1] * w10 + f.b[i + w] * w01 + f.b[i + w + 1] * w11
-                    cnt[o] = (cnt[o] + 1).toShort()
+                    val pr = f.r[i] * w00 + f.r[i + 1] * w10 + f.r[i + w] * w01 + f.r[i + w + 1] * w11
+                    val pg = f.g[i] * w00 + f.g[i + 1] * w10 + f.g[i + w] * w01 + f.g[i + w + 1] * w11
+                    val pb = f.b[i] * w00 + f.b[i + 1] * w10 + f.b[i + w] * w01 + f.b[i + w + 1] * w11
+                    val n = cnt[o].toInt()
+                    var accept = true
+                    if (n >= 3) {
+                        tested++
+                        val inv = 1f / (n - 1)
+                        // piso no sigma: protege estrelas brilhantes (cintilação) de serem cortadas
+                        val sr = max(sqrt(vr[o] * inv), 2f + 0.05f * abs(mr[o]))
+                        val sg = max(sqrt(vg[o] * inv), 2f + 0.05f * abs(mg[o]))
+                        val sb = max(sqrt(vb[o] * inv), 2f + 0.05f * abs(mb[o]))
+                        if (abs(pr - mr[o]) > kappa * sr || abs(pg - mg[o]) > kappa * sg || abs(pb - mb[o]) > kappa * sb) {
+                            accept = false
+                            rejected++
+                        }
+                    }
+                    if (accept) {
+                        val n1 = n + 1
+                        val inv1 = 1f / n1
+                        var d = pr - mr[o]; mr[o] += d * inv1; vr[o] += d * (pr - mr[o])
+                        d = pg - mg[o]; mg[o] += d * inv1; vg[o] += d * (pg - mg[o])
+                        d = pb - mb[o]; mb[o] += d * inv1; vb[o] += d * (pb - mb[o])
+                        cnt[o] = n1.toShort()
+                    }
                 }
                 xs += c
                 ys -= s
             }
         }
+        lastRejectedPct = if (tested > 0) 100f * rejected / tested else 0f
     }
 
     /**
@@ -337,7 +410,7 @@ class Stacker(val w: Int, val h: Int) {
      * @param strength 0..100, força do realce
      * @param removeGradient tira o brilho da poluição luminosa
      */
-    fun render(scale: Int, strength: Int, removeGradient: Boolean): RenderedImage? {
+    fun render(scale: Int, strength: Float, removeGradient: Boolean): RenderedImage? {
         if (stacked == 0) return null
         val dw = w / scale
         val dh = h / scale
@@ -359,7 +432,7 @@ class Stacker(val w: Int, val h: Int) {
                         val i = row + x * scale + xx
                         val c = cnt[i].toInt()
                         if (c > 0) {
-                            r += sr[i] / c; g += sg[i] / c; b += sb[i] / c; k++
+                            r += mr[i]; g += mg[i]; b += mb[i]; k++
                         }
                     }
                 }

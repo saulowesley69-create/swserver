@@ -2,11 +2,9 @@ package com.swgames.astrostack
 
 import android.Manifest
 import android.annotation.SuppressLint
-import android.app.Activity
 import android.content.ContentValues
 import android.content.pm.PackageManager
 import android.graphics.Bitmap
-import android.graphics.Color
 import android.graphics.ImageFormat
 import android.graphics.Matrix
 import android.graphics.SurfaceTexture
@@ -15,8 +13,10 @@ import android.hardware.camera2.CameraCharacteristics
 import android.hardware.camera2.CameraDevice
 import android.hardware.camera2.CameraManager
 import android.hardware.camera2.CaptureRequest
+import android.media.AudioManager
 import android.media.Image
 import android.media.ImageReader
+import android.media.ToneGenerator
 import android.os.Bundle
 import android.os.Environment
 import android.os.Handler
@@ -24,39 +24,22 @@ import android.os.HandlerThread
 import android.os.Looper
 import android.provider.MediaStore
 import android.util.Size
-import android.view.Gravity
 import android.view.Surface
 import android.view.TextureView
-import android.view.View
-import android.view.ViewGroup
 import android.view.WindowManager
-import android.widget.Button
-import android.widget.CheckBox
-import android.widget.FrameLayout
-import android.widget.ImageView
-import android.widget.LinearLayout
-import android.widget.SeekBar
-import android.widget.TextView
+import androidx.activity.ComponentActivity
+import androidx.activity.compose.setContent
+import androidx.activity.enableEdgeToEdge
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
 import java.util.concurrent.Executors
 import kotlin.math.abs
 
-class MainActivity : Activity() {
+class MainActivity : ComponentActivity(), Actions {
 
-    // ---------- Tela ----------
+    private val state = AppState()
     private lateinit var textureView: TextureView
-    private lateinit var resultView: ImageView
-    private lateinit var statusText: TextView
-    private lateinit var btnExposure: Button
-    private lateinit var btnIso: Button
-    private lateinit var btnFrames: Button
-    private lateinit var btnStart: Button
-    private lateinit var btnSave: Button
-    private lateinit var btnView: Button
-    private lateinit var stretchBar: SeekBar
-    private lateinit var gradientBox: CheckBox
 
     // ---------- Threads ----------
     private val camThread = HandlerThread("camera").apply { start() }
@@ -73,36 +56,51 @@ class MainActivity : Activity() {
     private var previewSize = Size(1280, 960)
     private var sensorOrientation = 90
     private var maxExposureNs = 1_000_000_000L
-    private var minIso = 100
     private var maxIso = 3200
 
-    // ---------- Ajustes ----------
     private val allExposures = listOf(0.5, 1.0, 2.0, 4.0, 6.0, 8.0, 10.0, 15.0, 20.0, 25.0, 30.0)
-    private var exposures = listOf(1.0)
-    private var expIdx = 0
-    private var isos = listOf(800)
-    private var isoIdx = 0
-    private val frameOptions = listOf(5, 10, 20, 30, 50, 100)
-    private var framesIdx = 2
 
-    @Volatile private var strength = 50
-    @Volatile private var removeGradient = true
-
-    // ---------- Sessão de fotos ----------
+    // ---------- Sessão (mexidos só na thread da câmera / worker) ----------
     @Volatile private var running = false
-    @Volatile private var framesTaken = 0
+    @Volatile private var capMode = Mode.IDLE
+    private var framesTaken = 0
+    private var target = 0
+    private var shotExpNs = 0L
+    private var shotIso = 0
+    private var dithered = false
     private var stacker: Stacker? = null
+    private var darkBuilder: DarkBuilder? = null
+    @Volatile private var masterDark: MasterDark? = null
+
+    private val darkFrames = 10
+    private val ditherEvery = 5
+
+    private val tone by lazy {
+        try { ToneGenerator(AudioManager.STREAM_NOTIFICATION, 80) } catch (_: Exception) { null }
+    }
 
     // =====================================================================
     override fun onCreate(savedInstanceState: Bundle?) {
+        enableEdgeToEdge()
         super.onCreate(savedInstanceState)
         window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
-        buildUi()
+
+        textureView = TextureView(this)
+        textureView.surfaceTextureListener = object : TextureView.SurfaceTextureListener {
+            override fun onSurfaceTextureAvailable(st: SurfaceTexture, w: Int, h: Int) = openCamera()
+            override fun onSurfaceTextureSizeChanged(st: SurfaceTexture, w: Int, h: Int) {}
+            override fun onSurfaceTextureDestroyed(st: SurfaceTexture) = true
+            override fun onSurfaceTextureUpdated(st: SurfaceTexture) {}
+        }
+
+        setContent { AstroApp(state, this) { textureView } }
+
         if (checkSelfPermission(Manifest.permission.CAMERA) != PackageManager.PERMISSION_GRANTED) {
             requestPermissions(arrayOf(Manifest.permission.CAMERA), 1)
         }
     }
 
+    @Deprecated("Deprecated in Java")
     override fun onRequestPermissionsResult(code: Int, perms: Array<out String>, results: IntArray) {
         super.onRequestPermissionsResult(code, perms, results)
         if (results.isNotEmpty() && results[0] == PackageManager.PERMISSION_GRANTED) {
@@ -118,7 +116,7 @@ class MainActivity : Activity() {
     }
 
     override fun onPause() {
-        stopRun(restartPreview = false)
+        stopInternal(restartPreview = false)
         closeCamera()
         super.onPause()
     }
@@ -126,133 +124,12 @@ class MainActivity : Activity() {
     override fun onDestroy() {
         worker.shutdown()
         camThread.quitSafely()
+        try { tone?.release() } catch (_: Exception) {}
         super.onDestroy()
     }
 
-    // =====================================================================
-    // Interface (feita em código, em vermelho pra não ofuscar a visão noturna)
-    private val red = Color.rgb(255, 70, 70)
-
-    private fun mkButton(label: String, onClick: () -> Unit): Button = Button(this).apply {
-        text = label
-        setTextColor(red)
-        setBackgroundColor(Color.rgb(30, 0, 0))
-        isAllCaps = false
-        textSize = 14f
-        setOnClickListener { onClick() }
-        layoutParams = LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f).apply {
-            setMargins(6, 6, 6, 6)
-        }
-    }
-
-    private fun row(vararg views: View) = LinearLayout(this).apply {
-        orientation = LinearLayout.HORIZONTAL
-        views.forEach { addView(it) }
-    }
-
-    private fun buildUi() {
-        val root = FrameLayout(this).apply { setBackgroundColor(Color.BLACK) }
-
-        textureView = TextureView(this)
-        textureView.surfaceTextureListener = object : TextureView.SurfaceTextureListener {
-            override fun onSurfaceTextureAvailable(st: SurfaceTexture, w: Int, h: Int) = openCamera()
-            override fun onSurfaceTextureSizeChanged(st: SurfaceTexture, w: Int, h: Int) {}
-            override fun onSurfaceTextureDestroyed(st: SurfaceTexture) = true
-            override fun onSurfaceTextureUpdated(st: SurfaceTexture) {}
-        }
-        root.addView(textureView, FrameLayout.LayoutParams(-1, -1))
-
-        resultView = ImageView(this).apply {
-            setBackgroundColor(Color.BLACK)
-            scaleType = ImageView.ScaleType.FIT_CENTER
-            visibility = View.GONE
-        }
-        root.addView(resultView, FrameLayout.LayoutParams(-1, -1))
-
-        val title = TextView(this).apply {
-            text = "AstroStack"
-            setTextColor(red)
-            textSize = 18f
-            setPadding(24, 48, 24, 12)
-        }
-        root.addView(title, FrameLayout.LayoutParams(-2, -2, Gravity.TOP or Gravity.START))
-
-        statusText = TextView(this).apply {
-            setTextColor(red)
-            textSize = 14f
-            setPadding(12, 8, 12, 8)
-            text = "Abrindo a câmera…"
-        }
-        btnExposure = mkButton("Exposição") { cycleExposure() }
-        btnIso = mkButton("ISO") { cycleIso() }
-        btnFrames = mkButton("Fotos") { cycleFrames() }
-        btnStart = mkButton("▶ INICIAR") { if (running) stopRun(true) else startRun() }
-        btnSave = mkButton("💾 Salvar") { saveCurrent() }
-        btnView = mkButton("👁 Câmera") { toggleView() }
-
-        val stretchLabel = TextView(this).apply {
-            setTextColor(red); text = "Realce"; setPadding(12, 0, 12, 0)
-        }
-        stretchBar = SeekBar(this).apply {
-            max = 100
-            progress = strength
-            layoutParams = LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f)
-            setOnSeekBarChangeListener(object : SeekBar.OnSeekBarChangeListener {
-                override fun onProgressChanged(sb: SeekBar, p: Int, fromUser: Boolean) {
-                    strength = p
-                }
-                override fun onStartTrackingTouch(sb: SeekBar) {}
-                override fun onStopTrackingTouch(sb: SeekBar) = refreshRender()
-            })
-        }
-        gradientBox = CheckBox(this).apply {
-            text = "Tirar poluição luminosa"
-            setTextColor(red)
-            isChecked = removeGradient
-            setOnCheckedChangeListener { _, c -> removeGradient = c; refreshRender() }
-        }
-
-        val panel = LinearLayout(this).apply {
-            orientation = LinearLayout.VERTICAL
-            setBackgroundColor(Color.argb(200, 0, 0, 0))
-            setPadding(8, 8, 8, 32)
-            addView(statusText)
-            addView(row(btnExposure, btnIso, btnFrames))
-            addView(row(stretchLabel, stretchBar))
-            addView(gradientBox)
-            addView(row(btnStart, btnSave, btnView))
-        }
-        root.addView(panel, FrameLayout.LayoutParams(-1, -2, Gravity.BOTTOM))
-        setContentView(root)
-        updateLabels()
-    }
-
-    private fun expLabel(): String {
-        val e = exposures[expIdx]
-        return if (e < 1.0) "1/${(1 / e).toInt()} s" else "${e.toInt()} s"
-    }
-
-    private fun updateLabels() {
-        btnExposure.text = "⏱ ${expLabel()}"
-        btnIso.text = "ISO ${isos[isoIdx]}"
-        btnFrames.text = "📷 ${frameOptions[framesIdx]}x"
-    }
-
-    private fun cycleExposure() { if (!running) { expIdx = (expIdx + 1) % exposures.size; updateLabels() } }
-    private fun cycleIso() { if (!running) { isoIdx = (isoIdx + 1) % isos.size; updateLabels() } }
-    private fun cycleFrames() { if (!running) { framesIdx = (framesIdx + 1) % frameOptions.size; updateLabels() } }
-
-    private fun toggleView() {
-        val showResult = resultView.visibility != View.VISIBLE
-        showResult(showResult)
-    }
-
-    private fun showResult(show: Boolean) {
-        resultView.visibility = if (show) View.VISIBLE else View.GONE
-        btnView.text = if (show) "👁 Câmera" else "👁 Resultado"
-    }
-
-    private fun setStatus(t: String) = ui.post { statusText.text = t }
+    private fun setStatus(t: String) = ui.post { state.status = t }
+    private fun onUi(block: () -> Unit) = ui.post(block)
 
     // =====================================================================
     // Câmera
@@ -281,14 +158,18 @@ class MainActivity : Activity() {
 
         sensorOrientation = ch.get(CameraCharacteristics.SENSOR_ORIENTATION) ?: 90
         maxExposureNs = ch.get(CameraCharacteristics.SENSOR_INFO_EXPOSURE_TIME_RANGE)?.upper ?: 1_000_000_000L
+        var minIso = 100
         ch.get(CameraCharacteristics.SENSOR_INFO_SENSITIVITY_RANGE)?.let { minIso = it.lower; maxIso = it.upper }
 
         val maxSec = maxExposureNs / 1e9
-        exposures = allExposures.filter { it <= maxSec + 0.01 }.ifEmpty { listOf(maxSec) }
-        expIdx = exposures.indices.minByOrNull { abs(exposures[it] - 10.0) } ?: 0
-        isos = listOf(100, 200, 400, 800, 1600, 3200, 6400).filter { it in minIso..maxIso }.ifEmpty { listOf(maxIso) }
-        isoIdx = isos.indices.minByOrNull { abs(isos[it] - 1600) } ?: 0
-        ui.post { updateLabels() }
+        val exps = allExposures.filter { it <= maxSec + 0.01 }.ifEmpty { listOf(maxSec) }
+        val isoList = listOf(100, 200, 400, 800, 1600, 3200, 6400).filter { it in minIso..maxIso }.ifEmpty { listOf(maxIso) }
+        onUi {
+            state.exposures = exps
+            state.expIdx = exps.indices.minByOrNull { abs(exps[it] - 10.0) } ?: 0
+            state.isos = isoList
+            state.isoIdx = isoList.indices.minByOrNull { abs(isoList[it] - 1600) } ?: 0
+        }
 
         val map = ch.get(CameraCharacteristics.SCALER_STREAM_CONFIGURATION_MAP) ?: return
         val yuvSizes = map.getOutputSizes(ImageFormat.YUV_420_888)
@@ -300,9 +181,9 @@ class MainActivity : Activity() {
             .maxByOrNull { it.width * it.height } ?: Size(1280, 720)
 
         setStatus(
-            "Câmera pronta. Exposição máx: ${"%.0f".format(maxSec)} s" +
-                (if (!manualOk) " (aviso: seu celular pode ignorar o modo manual)" else "") +
-                "\nApoie o celular num tripé e aponte pro céu."
+            "Pronto. Exposição máxima do seu celular: ${"%.0f".format(maxSec)} s" +
+                (if (!manualOk) "\nAviso: seu celular pode ignorar o modo manual." else "") +
+                "\nApoie o celular firme e aponte pro céu."
         )
 
         try {
@@ -366,7 +247,6 @@ class MainActivity : Activity() {
         try {
             val b = cam.createCaptureRequest(CameraDevice.TEMPLATE_PREVIEW)
             b.addTarget(ps)
-            // prévia com 1/4 s pra dar pra ver as estrelas mais fortes
             applyManual(b, minOf(250_000_000L, maxExposureNs), minOf(maxIso, 3200))
             s.setRepeatingRequest(b.build(), null, camHandler)
         } catch (e: Exception) {
@@ -382,108 +262,230 @@ class MainActivity : Activity() {
     }
 
     // =====================================================================
-    // Sessão de fotos com empilhamento ao vivo
-    private fun startRun() {
+    // Ações da tela
+    override fun start() = begin(Mode.LIGHTS)
+
+    override fun takeDarks() = begin(Mode.DARKS)
+
+    override fun clearDarks() {
+        masterDark = null
+        state.darkInfo = null
+        setStatus("Dark frames apagados.")
+    }
+
+    override fun stop() = stopInternal(restartPreview = true)
+
+    override fun save() {
+        worker.execute {
+            val st = stacker
+            if (st == null || st.stacked == 0) { setStatus("Ainda não tem nada pra salvar."); return@execute }
+            val name = saveStack(st)
+            if (name.isNotEmpty()) setStatus("Salvo em Imagens/AstroStack/$name")
+        }
+    }
+
+    override fun rerender() {
+        val strength = state.strength
+        val grad = state.removeGradient
+        worker.execute {
+            val st = stacker ?: return@execute
+            val out = st.render(2, strength, grad) ?: return@execute
+            val bmp = toBitmap(out)
+            onUi { state.result = bmp }
+        }
+    }
+
+    private fun begin(mode: Mode) {
         if (session == null) { setStatus("A câmera ainda não está pronta."); return }
-        running = true
+        if (state.busy) return
+        shotExpNs = (state.exposure * 1e9).toLong()
+        shotIso = state.iso
+        target = if (mode == Mode.DARKS) darkFrames else state.frames
         framesTaken = 0
-        worker.execute { stacker = null }
-        btnStart.text = "■ PARAR"
-        setStatus("Começando em 3 s… não encoste no celular!")
-        camHandler.postDelayed({
-            if (running) {
+        dithered = false
+        running = true
+        capMode = mode
+
+        val dark = masterDark
+        val darkOk = dark != null && dark.exposureNs == shotExpNs && dark.iso == shotIso
+        worker.execute {
+            if (mode == Mode.LIGHTS) stacker = null
+            if (mode == Mode.DARKS) darkBuilder = null
+        }
+
+        val wait = if (mode == Mode.DARKS) 5 else 3
+        state.total = target
+        state.done = 0
+        state.mode = Mode.COUNTDOWN
+        state.countdown = wait
+        if (mode == Mode.DARKS) {
+            state.status = "Tampe a lente (dedo, fita ou tampa) e não deixe entrar luz."
+        } else {
+            state.stacked = 0
+            state.stars = 0
+            state.status = when {
+                darkOk -> "Usando dark frames. Não encoste no celular!"
+                dark != null -> "Os darks são de outra exposição/ISO e não vão ser usados. Não encoste no celular!"
+                else -> "Não encoste no celular!"
+            }
+        }
+        tick(wait, mode)
+    }
+
+    private fun tick(left: Int, mode: Mode) {
+        if (!running) return
+        if (left <= 0) {
+            state.mode = mode
+            camHandler.post {
                 try { session?.stopRepeating() } catch (_: Exception) {}
                 captureNext()
             }
-        }, 3000)
+            return
+        }
+        state.countdown = left
+        ui.postDelayed({ tick(left - 1, mode) }, 1000)
     }
 
-    private fun stopRun(restartPreview: Boolean) {
+    private fun stopInternal(restartPreview: Boolean) {
         val was = running
         running = false
-        ui.post { btnStart.text = "▶ INICIAR" }
+        capMode = Mode.IDLE
+        onUi {
+            state.mode = Mode.IDLE
+            if (was) state.status = "Parado. ${state.stacked} fotos empilhadas."
+        }
         if (was && restartPreview) camHandler.post { startPreview() }
     }
 
+    // =====================================================================
+    // Sequência de fotos (thread da câmera)
     private fun captureNext() {
         if (!running) return
-        val total = frameOptions[framesIdx]
-        if (framesTaken >= total) { finishRun(); return }
+        if (framesTaken >= target) { finish(); return }
+
+        // Dithering manual: a cada N fotos, pede pra mexer o celular de leve
+        if (capMode == Mode.LIGHTS && state.dither && framesTaken > 0 &&
+            framesTaken % ditherEvery == 0 && !dithered
+        ) {
+            dithered = true
+            onUi {
+                state.mode = Mode.DITHER
+                state.status = "Dê um toquinho bem leve no celular (alguns milímetros)…"
+            }
+            try { tone?.startTone(ToneGenerator.TONE_PROP_BEEP, 200) } catch (_: Exception) {}
+            camHandler.postDelayed({
+                if (running) {
+                    onUi { if (state.mode == Mode.DITHER) state.mode = Mode.LIGHTS }
+                    captureNext()
+                }
+            }, 4000)
+            return
+        }
+        dithered = false
+
         val cam = camera ?: return
         val s = session ?: return
         val r = reader ?: return
         try {
             val b = cam.createCaptureRequest(CameraDevice.TEMPLATE_STILL_CAPTURE)
             b.addTarget(r.surface)
-            applyManual(b, (exposures[expIdx] * 1e9).toLong(), isos[isoIdx])
+            applyManual(b, shotExpNs, shotIso)
             s.capture(b.build(), null, camHandler)
             framesTaken++
-            setStatus("Fotografando $framesTaken/$total (${expLabel()})…")
+            val n = framesTaken
+            val kind = if (capMode == Mode.DARKS) "Dark" else "Foto"
+            setStatus("$kind $n de $target (${state.expLabel()}, ISO $shotIso)…")
         } catch (e: Exception) {
             setStatus("Erro ao fotografar: ${e.message}")
-            stopRun(true)
+            stopInternal(true)
         }
     }
 
     private fun onImage(rd: ImageReader) {
         val img = try { rd.acquireNextImage() } catch (_: Exception) { null } ?: return
         if (!running) { img.close(); return }
+        val mode = capMode
+        val strength = state.strength
+        val grad = state.removeGradient
         worker.execute {
             try {
                 val frame = try { toFrame(img) } finally { img.close() }
-                val st = stacker ?: Stacker(frame.w, frame.h).also { stacker = it }
-                val ok = st.add(frame)
-                val out = st.render(2, strength, removeGradient)
-                val bmp = out?.let { toBitmap(it) }
-                ui.post {
-                    if (bmp != null) { resultView.setImageBitmap(bmp); showResult(true) }
+                if (mode == Mode.DARKS) {
+                    val db = darkBuilder ?: DarkBuilder(frame.w, frame.h, shotExpNs, shotIso).also { darkBuilder = it }
+                    db.add(frame)
+                    val c = db.count
+                    onUi { state.done = c }
+                } else {
+                    val st = stacker ?: run {
+                        val d = masterDark
+                        val use = if (d != null && d.exposureNs == shotExpNs && d.iso == shotIso) d else null
+                        Stacker(frame.w, frame.h, use).also { stacker = it }
+                    }
+                    val ok = st.add(frame)
+                    val bmp = st.render(2, strength, grad)?.let { toBitmap(it) }
+                    val stacked = st.stacked
+                    val stars = st.lastStarCount
+                    val rej = st.lastRejectedPct
+                    onUi {
+                        if (bmp != null) {
+                            state.result = bmp
+                            if (stacked == 1) state.showResult = true
+                        }
+                        state.done = framesTaken
+                        state.stacked = stacked
+                        state.stars = stars
+                        state.rejectedPct = rej
+                        if (!ok) state.status = "Essa foto não alinhou e foi descartada (nuvem ou celular mexeu?)."
+                    }
                 }
-                setStatus(
-                    "Empilhadas ${st.stacked} de $framesTaken • ${st.lastStarCount} estrelas" +
-                        if (!ok) "\n(essa foto não alinhou e foi descartada)" else ""
-                )
             } catch (e: Throwable) {
-                setStatus("Erro no empilhamento: ${e.message}")
+                setStatus("Erro no processamento: ${e.message}")
             }
             camHandler.post { captureNext() }
         }
     }
 
-    private fun finishRun() {
+    private fun finish() {
+        val mode = capMode
         running = false
-        ui.post { btnStart.text = "▶ INICIAR" }
+        capMode = Mode.IDLE
         startPreview()
         worker.execute {
-            val st = stacker
-            if (st == null || st.stacked == 0) {
-                setStatus("Nenhuma foto alinhou. Tente mais exposição ou ISO.")
-                return@execute
+            if (mode == Mode.DARKS) {
+                val md = darkBuilder?.build()
+                darkBuilder = null
+                masterDark = md
+                onUi {
+                    state.mode = Mode.IDLE
+                    if (md != null) {
+                        state.darkInfo = "Darks: ${md.frames}x ${state.expLabel()} • ISO ${md.iso}"
+                        state.status = "Dark frames prontos! Destampe a lente e toque no botão grande."
+                    } else {
+                        state.status = "Não consegui tirar os darks."
+                    }
+                }
+            } else {
+                val st = stacker
+                if (st == null || st.stacked == 0) {
+                    onUi {
+                        state.mode = Mode.IDLE
+                        state.status = "Nenhuma foto alinhou. Tente mais exposição ou ISO."
+                    }
+                    return@execute
+                }
+                val name = saveStack(st)
+                val n = st.stacked
+                val dk = if (st.usesDark) " com darks" else ""
+                onUi {
+                    state.mode = Mode.IDLE
+                    state.status = "Pronto! $n fotos empilhadas$dk.\nSalvo em Imagens/AstroStack/$name"
+                }
             }
-            val name = saveStack(st)
-            setStatus("Pronto! ${st.stacked} fotos empilhadas.\nSalvo em Imagens/AstroStack/$name")
-        }
-    }
-
-    private fun refreshRender() {
-        worker.execute {
-            val st = stacker ?: return@execute
-            val out = st.render(2, strength, removeGradient) ?: return@execute
-            val bmp = toBitmap(out)
-            ui.post { resultView.setImageBitmap(bmp) }
-        }
-    }
-
-    private fun saveCurrent() {
-        worker.execute {
-            val st = stacker
-            if (st == null || st.stacked == 0) { setStatus("Ainda não tem nada pra salvar."); return@execute }
-            val name = saveStack(st)
-            setStatus("Salvo em Imagens/AstroStack/$name")
         }
     }
 
     private fun saveStack(st: Stacker): String {
-        val out = st.render(1, strength, removeGradient) ?: return ""
+        val out = st.render(1, state.strength, state.removeGradient) ?: return ""
         val bmp = toBitmap(out)
         val name = "AstroStack_" + SimpleDateFormat("yyyyMMdd_HHmmss", Locale.US).format(Date()) + ".jpg"
         return try {

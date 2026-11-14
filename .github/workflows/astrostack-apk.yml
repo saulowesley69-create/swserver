@@ -31,7 +31,15 @@ jobs:
           gradle-version: '8.9'
 
       - name: Compilar APK
-        run: gradle assembleDebug --no-daemon --stacktrace
+        run: |
+          set -o pipefail
+          gradle assembleDebug --no-daemon 2>&1 | tee build.log || {
+            # Mostra os erros como anotações (dá pra ler pela API pública)
+            grep -E "^e: |error:|What went wrong" -A2 build.log | head -40 | while IFS= read -r l; do
+              echo "::error::$l"
+            done
+            exit 1
+          }
 
       - name: Renomear APK
         run: cp app/build/outputs/apk/debug/app-debug.apk AstroStack.apk
