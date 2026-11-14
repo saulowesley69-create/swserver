@@ -1,7 +1,6 @@
 package com.swgames.astrostack
 
 import kotlin.math.abs
-import kotlin.math.asinh
 import kotlin.math.atan2
 import kotlin.math.cos
 import kotlin.math.max
@@ -235,11 +234,23 @@ class Stacker(val w: Int, val h: Int) {
     var lastStarCount = 0
         private set
 
+    // Soma das fotos SEM alinhar: as estrelas se espalham, mas o padrão fixo
+    // do sensor fica parado. É isso que causa as listras ("ruído andante").
+    private val ur = FloatArray(w * h)
+    private val ug = FloatArray(w * h)
+    private val ub = FloatArray(w * h)
+    private var rawFrames = 0
+
     /** Adiciona uma foto. Retorna false se ela foi rejeitada (não alinhou). */
     fun add(f: Frame): Boolean {
         if (f.w != w || f.h != h) return false
         val (_, sigma) = f.bgStats()
         f.removeHotPixels(sigma)
+        for (i in 0 until w * h) {
+            ur[i] += f.r[i]; ug[i] += f.g[i]; ub[i] += f.b[i]
+        }
+        rawFrames++
+        if (rawFrames >= 3) removeFixedPattern(f, sigma)
         val stars = StarDetector.detect(f, 80)
         lastStarCount = stars.size
         val ref = refStars
@@ -255,6 +266,23 @@ class Stacker(val w: Int, val h: Int) {
         accumulate(f, t)
         stacked++
         return true
+    }
+
+    /**
+     * Padrão fixo = média sem alinhar − versão borrada dela.
+     * Limitado a ±2σ pra nunca apagar estrela de verdade.
+     */
+    private fun removeFixedPattern(f: Frame, sigma: Float) {
+        val inv = 1f / rawFrames
+        val lim = 2f * sigma
+        val n = w * h
+        val mean = FloatArray(n)
+        for ((u, target) in listOf(Pair(ur, f.r), Pair(ug, f.g), Pair(ub, f.b))) {
+            for (i in 0 until n) mean[i] = u[i] * inv
+            val blur = boxBlur(mean, w, h, 10)
+            for (i in 0 until n) target[i] -= (mean[i] - blur[i]).coerceIn(-lim, lim)
+        }
+        for (i in 0 until n) f.lum[i] = 0.299f * f.r[i] + 0.587f * f.g[i] + 0.114f * f.b[i]
     }
 
     private fun accumulate(f: Frame, t: Transform) {
@@ -333,37 +361,55 @@ class Stacker(val w: Int, val h: Int) {
             subtractGradient(gg, dw, dh)
             subtractGradient(bb, dw, dh)
         }
-        // Ponto preto por canal (mediana) = céu neutro, sem cor esverdeada/azulada
-        val br = percentile(rr, 0.5f)
-        val bg = percentile(gg, 0.5f)
-        val bbk = percentile(bb, 0.5f)
-        val lumS = FloatArray(n)
-        for (i in 0 until n) lumS[i] = ((rr[i] - br) + (gg[i] - bg) + (bb[i] - bbk)) / 3f
-        val white = max(percentile(lumS, 0.9995f), 1f)
-        val k = 1f + strength * 0.6f
-        val norm = asinh(k)
-        val pedestal = 0.025f
+        // Tira o ruído colorido: borra só a cor, mantém o brilho nítido.
+        val cr = max(1, 6 / scale)
+        val lum = FloatArray(n) { (rr[it] + gg[it] + bb[it]) / 3f }
+        val dr = boxBlur(FloatArray(n) { rr[it] - lum[it] }, dw, dh, cr)
+        val dg = boxBlur(FloatArray(n) { gg[it] - lum[it] }, dw, dh, cr)
+        val db = boxBlur(FloatArray(n) { bb[it] - lum[it] }, dw, dh, cr)
+        for (i in 0 until n) {
+            rr[i] = lum[i] + dr[i]; gg[i] = lum[i] + dg[i]; bb[i] = lum[i] + db[i]
+        }
+
+        // Realce estilo Siril: o fundo do céu vai pra um cinza escuro fixo,
+        // em vez de esticar até a estrela mais forte (que estourava o ruído).
+        val target = 0.06f + strength / 100f * 0.24f
+        val lr = Levels.of(rr, target)
+        val lg = Levels.of(gg, target)
+        val lb = Levels.of(bb, target)
         val px = IntArray(n)
         for (i in 0 until n) {
-            val r = stretch((rr[i] - br) / white + pedestal, k, norm)
-            val g = stretch((gg[i] - bg) / white + pedestal, k, norm)
-            val b = stretch((bb[i] - bbk) / white + pedestal, k, norm)
-            px[i] = (0xFF shl 24) or (r shl 16) or (g shl 8) or b
+            px[i] = (0xFF shl 24) or (lr.apply(rr[i]) shl 16) or (lg.apply(gg[i]) shl 8) or lb.apply(bb[i])
         }
         return RenderedImage(dw, dh, px)
     }
 
-    private fun stretch(v: Float, k: Float, norm: Float): Int {
-        val x = if (v <= 0f) 0f else asinh(k * v) / norm
-        return (min(1f, x) * 255f).toInt()
-    }
+    /** Ponto preto + curva de meios-tons (MTF) de um canal. */
+    private class Levels(val black: Float, val range: Float, val m: Float) {
+        fun apply(v: Float): Int {
+            val x = ((v - black) / range).coerceIn(0f, 1f)
+            val y = if (x <= 0f) 0f else ((m - 1f) * x) / ((2f * m - 1f) * x - m)
+            return (y.coerceIn(0f, 1f) * 255f).toInt()
+        }
 
-    private fun percentile(a: FloatArray, p: Float): Float {
-        val step = max(1, a.size / 50000)
-        val n = a.size / step
-        val s = FloatArray(n) { a[it * step] }
-        s.sort()
-        return s[min(n - 1, (p * n).toInt())]
+        companion object {
+            fun of(a: FloatArray, target: Float): Levels {
+                val step = max(1, a.size / 50000)
+                val n = a.size / step
+                val s = FloatArray(n) { a[it * step] }
+                s.sort()
+                val med = s[n / 2]
+                for (k in 0 until n) s[k] = abs(s[k] - med)
+                s.sort()
+                val sigma = max(1.4826f * s[n / 2], 0.3f)
+                val black = max(0f, med - 2.8f * sigma)
+                val range = max(255f - black, 1f)
+                val bn = ((med - black) / range).coerceIn(1e-4f, 0.99f)
+                // m que leva o fundo (bn) até o alvo
+                val m = (bn * (target - 1f) / (2f * target * bn - target - bn)).coerceIn(1e-4f, 0.9999f)
+                return Levels(black, range, m)
+            }
+        }
     }
 
     /** Estima o fundo numa grade (percentil baixo, ignora estrelas) e subtrai. */
@@ -412,3 +458,28 @@ class Stacker(val w: Int, val h: Int) {
 }
 
 class RenderedImage(val w: Int, val h: Int, val pixels: IntArray)
+
+/** Desfoque de caixa separável (rápido), borda repetida. */
+fun boxBlur(src: FloatArray, w: Int, h: Int, r: Int): FloatArray {
+    val tmp = FloatArray(w * h)
+    val out = FloatArray(w * h)
+    val div = 1f / (2 * r + 1)
+    for (y in 0 until h) {
+        val row = y * w
+        var sum = 0f
+        for (k in -r..r) sum += src[row + k.coerceIn(0, w - 1)]
+        for (x in 0 until w) {
+            tmp[row + x] = sum * div
+            sum += src[row + (x + r + 1).coerceAtMost(w - 1)] - src[row + (x - r).coerceAtLeast(0)]
+        }
+    }
+    for (x in 0 until w) {
+        var sum = 0f
+        for (k in -r..r) sum += tmp[k.coerceIn(0, h - 1) * w + x]
+        for (y in 0 until h) {
+            out[y * w + x] = sum * div
+            sum += tmp[(y + r + 1).coerceAtMost(h - 1) * w + x] - tmp[(y - r).coerceAtLeast(0) * w + x]
+        }
+    }
+    return out
+}

@@ -6,6 +6,7 @@
 
     <application
         android:label="AstroStack"
+        android:largeHeap="true"
         android:icon="@android:drawable/ic_menu_camera"
         android:theme="@android:style/Theme.DeviceDefault.NoActionBar">
 
