@@ -101,7 +101,7 @@ class MainActivity : ComponentActivity(), Actions {
     }
 
     @Deprecated("Deprecated in Java")
-    override fun onRequestPermissionsResult(code: Int, perms: Array<out String>, results: IntArray) {
+    override fun onRequestPermissionsResult(code: Int, perms: Array<String>, results: IntArray) {
         super.onRequestPermissionsResult(code, perms, results)
         if (results.isNotEmpty() && results[0] == PackageManager.PERMISSION_GRANTED) {
             if (textureView.isAvailable) openCamera()
@@ -361,7 +361,7 @@ class MainActivity : ComponentActivity(), Actions {
     // Sequência de fotos (thread da câmera)
     private fun captureNext() {
         if (!running) return
-        if (framesTaken >= target) { finish(); return }
+        if (framesTaken >= target) { finishSession(); return }
 
         // Dithering manual: a cada N fotos, pede pra mexer o celular de leve
         if (capMode == Mode.LIGHTS && state.dither && framesTaken > 0 &&
@@ -445,7 +445,7 @@ class MainActivity : ComponentActivity(), Actions {
         }
     }
 
-    private fun finish() {
+    private fun finishSession() {
         val mode = capMode
         running = false
         capMode = Mode.IDLE
