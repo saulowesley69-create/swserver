@@ -4933,7 +4933,7 @@ const G = {
     const p = this.player; const key = p ? p.armor.map(s => s ? s.id : 0).join(',') + '|' + (p.held ? p.held.id : 0) : 'x'; if (key === this.pkey) return; this.pkey = key;
     while (this.pmesh.children.length) this.pmesh.remove(this.pmesh.children[0]);
     const m = { root: new THREE.Group(), mats: [], legs: [] }; m.root.scale.setScalar(0.92);
-    const SKN = S.skin || {}, SK = SKN.skin || [214, 160, 124], SK2 = shade(SK, 0.86), SH = SKN.shirt || [44, 132, 150], SH2 = shade(SH, 0.78), PA = SKN.pants || [62, 62, 110], HR = SKN.hair || [74, 48, 28];
+    const SKN = S.skin || {}, SK = SKN.skin || [214, 160, 124], SK2 = shade(SK, 0.86), SH = SKN.shirt || [214, 104, 44], SH2 = shade(SH, 0.78), PA = SKN.pants || [72, 76, 86], HR = SKN.hair || [38, 28, 24], ACC = SKN.acc || [58, 150, 96];
     const ac = i => { const s = p && p.armor[i]; if (!s || IT[s.id].wings) return null; return ARMOR_COL[IT[s.id].key.split('_')[0]] || [200, 200, 200]; };
     const AH = ac(0), AC = ac(1), AL = ac(2), AB = ac(3);
     for (const s of [-2, 2]) { const l = mkPart(m, m.root, 4, 12, 4, PA, s, 12, 0, 0, -6, 0); mkPart(m, l, 4.3, 2.5, 4.8, [70, 70, 76], 0, -10.8, -0.3); if (AL) mkPart(m, l, 4.7, 8, 4.7, AL, 0, -4, 0); if (AB) { mkPart(m, l, 4.9, 5, 5.2, AB, 0, -9.6, -0.2); mkPart(m, l, 5.1, 1.2, 5.4, shade(AB, 0.7), 0, -11.5, -0.2); } m.legs.push(l); }
@@ -4942,9 +4942,10 @@ const G = {
     if (AC) { mkPart(m, m.root, 8.9, 12.3, 4.9, AC, 0, 18.1, 0); mkPart(m, m.root, 5, 6, 0.5, shade(AC, 1.2), 0, 19.5, -2.6); mkPart(m, m.root, 9.1, 1.4, 5.1, shade(AC, 0.7), 0, 12.9, 0); }
     m.arms = [mkPart(m, m.root, 4, 12, 4, SK, -6, 22, 0, 0, -4, 0), mkPart(m, m.root, 4, 12, 4, SK, 6, 22, 0, 0, -4, 0)];
     m.arms.forEach(a => { mkPart(m, a, 4.25, 5.4, 4.25, SH, 0, -0.55, 0); mkPart(m, a, 4.1, 2.2, 4.1, SK2, 0, -8.9, 0); if (AC) { mkPart(m, a, 5, 5.4, 5, AC, 0, 0, 0); mkPart(m, a, 5.2, 1.3, 5.2, shade(AC, 0.7), 0, -2.4, 0); } });
-    const h = mkPart(m, m.root, 8, 8, 8, SK, 0, 24, 0, 0, 4, 0); m.head = h; mkPart(m, h, 8.4, 2.4, 8.4, HR, 0, 7.1, 0); mkPart(m, h, 8.4, 5.4, 2.4, HR, 0, 4.4, 3.1); mkPart(m, h, 0.5, 3, 5, HR, -4.1, 5, 0.5); mkPart(m, h, 0.5, 3, 5, HR, 4.1, 5, 0.5); mkPart(m, h, 5, 1, 0.5, HR, -1, 6, -4.1);
+    const h = mkPart(m, m.root, 8, 8, 8, SK, 0, 24, 0, 0, 4, 0); m.head = h; mkPart(m, h, 8.4, 2.4, 8.4, HR, 0, 7.1, 0); mkPart(m, h, 8.4, 5.4, 2.4, HR, 0, 4.4, 3.1); mkPart(m, h, 0.5, 3, 5, HR, -4.1, 5, 0.5); mkPart(m, h, 0.5, 3, 5, HR, 4.1, 5, 0.5); mkPart(m, h, 6, 1.4, 0.5, HR, -1.2, 6.2, -4.1); mkPart(m, h, 2.5, 1, 0.5, HR, -3, 5.2, -4.1);
     for (const s of [-1, 1]) { mkPart(m, h, 2, 1.2, 0.4, [245, 245, 245], s * 2, 4, -4.05); mkPart(m, h, 1, 1.2, 0.45, [60, 90, 170], s * 1.5, 4, -4.1); mkPart(m, h, 2, 0.6, 0.45, HR, s * 2, 5.2, -4.1); }
-    mkPart(m, h, 1.4, 1.2, 0.6, SK2, 0, 2.8, -4.1); mkPart(m, h, 3, 0.8, 0.45, [150, 90, 80], 0, 1.4, -4.1); mkPart(m, h, 4.4, 1.6, 0.45, shade(HR, 1.15), 0, 0.6, -4.08);
+    mkPart(m, h, 1.4, 1.2, 0.6, SK2, 0, 2.8, -4.1); mkPart(m, h, 3, 0.8, 0.45, [150, 90, 80], 0, 1.4, -4.1);
+    if (!AH) { mkPart(m, h, 8.6, 1.1, 8.6, ACC, 0, 5.9, 0); mkPart(m, h, 1.4, 2.6, 0.6, ACC, 3, 5, 4.4); } mkPart(m, m.root, 8.6, 1.8, 4.6, ACC, 0, 23.4, 0); mkPart(m, m.root, 2, 4, 0.6, shade(ACC, 0.85), -2.2, 21, -2.5); mkPart(m, m.root, 1, 10, 0.5, shade(SH, 0.8), 0, 18, -2.15);
     if (AH) { mkPart(m, h, 9, 3.6, 9, AH, 0, 6.6, 0); mkPart(m, h, 9, 5.5, 1, AH, 0, 3, 4.1); mkPart(m, h, 1, 5.5, 8, AH, -4.1, 3, 0.5); mkPart(m, h, 1, 5.5, 8, AH, 4.1, 3, 0.5); mkPart(m, h, 9.2, 1.2, 1, shade(AH, 0.7), 0, 5, -4.2); mkPart(m, h, 1.2, 3, 0.8, shade(AH, 0.85), 0, 3, -4.3); }
     const hs = p && p.held; if (hs) { const it = IT[hs.id]; let hm; if (it.block && BL[it.block].shape === 'bed') { hm = new THREE.Mesh(bedModelGeo(0.3), this.matSolid); hm.position.set(0, -0.72, -0.18); } else if (it.block && isHeld3D(it.block)) { hm = new THREE.Mesh(heldBlockGeo(it.block, 0.32), this.matSolid); hm.position.set(0, -0.72, -0.18); } else { hm = makeFlatItemMesh(hs.id, 0.75); hm.rotation.set(0, Math.PI / 2, 0); hm.rotation.z = it.tool ? -0.9 : 0; hm.position.set(0, -0.62, -0.38); } m.arms[1].add(hm); m.heldMesh = hm; if (it.tool === 'rod') { hm.rotation.set(0, Math.PI / 2, -0.25); hm.position.set(0, -0.7, -0.45); } }
     if (p && p.armor[1] && IT[p.armor[1].id].wings) { m.pwings = []; for (const s of [-1, 1]) { const wg = mkPart(m, m.root, 1, 1, 1, [80, 64, 96], s * 1.4, 23, 2.5); const a = mkPart(m, wg, 9, 20, 0.8, [134, 112, 150], 0, 0, 0, s * 4.5, -9, 0); mkPart(m, a, 8.2, 3, 0.9, [176, 156, 194], s * 4.5, -1.5, 0); mkPart(m, a, 1.2, 20, 1, [80, 64, 96], s * 8.6, -9, 0); wg.userData.s = s; m.pwings.push(wg); } }
@@ -5912,7 +5913,7 @@ try { if (UI.buildOptions) UI.buildOptions(); } catch (e) { }
 .rbook .rbtop{display:flex;gap:4px;align-items:center;margin-bottom:4px;font-size:15px}.rbook .rbtop label{display:flex;align-items:center;gap:4px;cursor:pointer}
 .rbook .rbgrid{display:grid;grid-template-columns:repeat(5,var(--s));gap:2px;overflow-y:auto;overflow-x:hidden;padding-right:2px}
 .rbook .rb{position:relative;width:var(--s);height:var(--s);background:#8b8b8b;border:2px solid;border-color:#fff #373737 #373737 #fff;cursor:pointer;display:flex;align-items:center;justify-content:center}
-.rbook .rb.no{background:#c27b7b}.rbook .rb.big{opacity:.4}
+.rbook .rb.no{background:#8b8b8b;box-shadow:inset 0 0 0 999px rgba(170,40,40,.22)}.rbook .rb.big{opacity:.4}
 .rbook .rb:hover{outline:2px solid #fff}`;
   document.head.appendChild(st);
   const offEl = document.createElement('div'); offEl.id = 'offslot'; offEl.className = 'slot'; setTimeout(() => { const hb = document.getElementById('hotbar'); if (hb) { hb.style.position = 'relative'; hb.appendChild(offEl); } }, 0);
@@ -6483,7 +6484,7 @@ Player.prototype.update = function (dt, inp) {
   const lockIcon = open => { const c = document.createElement('canvas'); c.width = c.height = 12; const g = c.getContext('2d'), P = (x, y, w, h, col) => { g.fillStyle = col; g.fillRect(x, y, w, h); };
     P(2, 6, 8, 6, '#c8a030'); P(2, 6, 8, 1, '#f0d060'); P(5, 8, 2, 2, '#503810'); const ox = open ? 3 : 0; P(3 + ox, 1, 1, 5, '#9a9aa4'); P(8 + ox, open ? 1 : 1, 1, open ? 2 : 5, '#9a9aa4'); P(3 + ox, 0, 6, 1, '#9a9aa4'); return c.toDataURL(); };
   document.documentElement.style.setProperty('--lockon', `url(${lockIcon(false)})`); document.documentElement.style.setProperty('--lockoff', `url(${lockIcon(true)})`);
-  const COLORS = { shirt: [[44, 132, 150], [180, 40, 40], [40, 120, 50], [230, 200, 60], [120, 60, 160], [240, 240, 240], [30, 30, 34], [230, 120, 40]], pants: [[62, 62, 110], [40, 40, 44], [110, 80, 50], [70, 110, 60], [150, 150, 160], [120, 30, 30]], hair: [[74, 48, 28], [30, 22, 16], [210, 170, 80], [160, 60, 30], [200, 200, 200], [40, 40, 120]], skin: [[214, 160, 124], [240, 200, 170], [180, 120, 80], [120, 80, 50], [80, 52, 34]] };
+  const COLORS = { shirt: [[214, 104, 44], [44, 132, 150], [180, 40, 40], [40, 120, 50], [230, 200, 60], [120, 60, 160], [240, 240, 240], [30, 30, 34], [230, 120, 40]], pants: [[72, 76, 86], [62, 62, 110], [40, 40, 44], [110, 80, 50], [70, 110, 60], [150, 150, 160], [120, 30, 30]], hair: [[38, 28, 24], [74, 48, 28], [210, 170, 80], [160, 60, 30], [200, 200, 200], [40, 40, 120]], skin: [[214, 160, 124], [240, 200, 170], [180, 120, 80], [120, 80, 50], [80, 52, 34]] };
   const NAMES = { shirt: 'Camiseta', pants: 'Calça', hair: 'Cabelo', skin: 'Pele' };
   UI.optPage = 'main';
   UI.buildOptions = function () {
@@ -8203,7 +8204,6 @@ MOB_CLASS.villager = function (x, y, z) { return new Villager(x, y, z, Math.floo
     for (let i = 9; i < 36; i++) { const s = byIdx(i); if (s) grid.appendChild(s.el); }
     const hot = document.createElement('div'); hot.className = 'pgrid photbar';
     for (let i = 0; i < 9; i++) { const s = byIdx(i); if (s) hot.appendChild(s.el); }
-    if (!book) { const n = grid.children.length, fill = (5 - n % 5) % 5; for (let i = 0; i < fill; i++) { const e = document.createElement('div'); e.className = 'slot cempty'; grid.appendChild(e); } }
     if (book) { book.classList.add('pbook'); left.appendChild(book); } else left.append(grid, hot);
     // baú: as fileiras viram uma grade rolável de 5 colunas
     const crefs = this.slots.filter(s => s.type === 'chest' && s.el);
@@ -8219,20 +8219,26 @@ MOB_CLASS.villager = function (x, y, z) { return new Villager(x, y, z, Math.floo
     return r;
   };
   const css = document.createElement('style'); css.textContent = `
-#invpanel.pocket{--ps:min(calc((92vh - 110px) / 5.6), calc(44vw / 5.4));display:flex;gap:10px;width:96vw;height:92vh;max-height:92vh;box-sizing:border-box;padding:10px 12px;overflow:hidden}
-#invpanel.pocket .pleft{flex:0 0 auto;display:flex;flex-direction:column;gap:6px;min-height:0;background:#b4b4b4;border:3px solid;border-color:#555 #fff #fff #555;padding:6px}
-#invpanel.pocket .pgrid{display:grid;grid-template-columns:repeat(5,var(--ps));overflow-y:auto;overflow-x:hidden;background:#8b8b8b;min-height:0}
-#invpanel.pocket .pleft>.pgrid:not(.photbar){flex:1}
-#invpanel.pocket .photbar{grid-template-columns:repeat(9,calc(var(--ps) * 5 / 9));overflow:hidden;flex:none;margin-top:2px}
+/* janela cheia, dividida em dois painéis do mesmo tamanho de altura */
+#invpanel.pocket{--ps:min(calc((92vh - 96px) / 4.5), calc((96vw - 60px) * 0.5 / 9), 64px);display:flex;gap:12px;width:min(96vw, calc(var(--ps) * 18 + 150px));height:auto;min-height:min(92vh, calc(var(--ps) * 5.6 + 60px));max-height:92vh;box-sizing:border-box;padding:12px;overflow:hidden;align-items:stretch}
+#invpanel.pocket .wtitle{font-size:min(22px,calc(var(--ps) * .42));margin:0 0 4px;color:#3f3f3f}
+#invpanel.pocket .pleft{flex:0 0 auto;display:flex;flex-direction:column;justify-content:center;gap:4px;min-height:0;background:#b9b9b9;border:3px solid;border-color:#555 #fff #fff #555;padding:8px}
+/* mochila igual em todo lugar: 9 colunas, mesma casa para a barra de baixo */
+#invpanel.pocket .pgrid{display:grid;grid-template-columns:repeat(9,var(--ps));overflow:hidden;background:transparent;min-height:0}
+#invpanel.pocket .photbar{margin-top:8px}
 #invpanel.pocket .pgrid .slot{width:var(--ps);height:var(--ps)}
-#invpanel.pocket .photbar .slot{width:calc(var(--ps) * 5 / 9);height:calc(var(--ps) * 5 / 9)}
-#invpanel.pocket .pgrid .slot .cnt{font-size:calc(var(--ps) * .42)}
-#invpanel.pocket .photbar .slot .cnt{font-size:calc(var(--ps) * .3)}
-#invpanel.pocket .pright{--s:min(calc((92vh - 60px) / 5.4), calc(56vw / 9.5), 56px);flex:1;min-width:0;display:flex;flex-direction:column;align-items:center;gap:6px;overflow-y:auto;overflow-x:hidden;padding-top:26px}
-#invpanel.pocket .pright .pchest{grid-template-columns:repeat(5,var(--ps));max-height:calc(var(--ps) * 4.6)}
-#invpanel.pocket .pright .pmini .pgrid{grid-template-columns:repeat(9,calc(var(--ps) * 0.6))}#invpanel.pocket .pright .pmini .pgrid .slot{width:calc(var(--ps) * 0.6);height:calc(var(--ps) * 0.6)}
-#invpanel.pocket .pbook{width:auto;flex:1;min-height:0;border:none;box-shadow:none;padding:0;background:transparent}
-#invpanel.pocket .wclose{top:6px!important;right:8px!important}`;
+#invpanel.pocket .slot .cnt{font-size:max(12px,calc(var(--ps) * .3));right:2px;bottom:0;text-shadow:2px 2px 0 #3f3f3f}
+#invpanel.pocket .pright{--s:min(calc((96vw - 60px - var(--ps) * 9 - 40px) / 10.2), calc((92vh - 70px) / 5.2), 56px);flex:1;min-width:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px;overflow-y:auto;overflow-x:hidden;background:#c6c6c6;border:3px solid;border-color:#555 #fff #fff #555;padding:8px 6px}
+#invpanel.pocket .pright .slot .cnt{font-size:max(12px,calc(var(--s) * .32))}
+#invpanel.pocket .pright .pchest{grid-template-columns:repeat(9,var(--s));max-height:calc(var(--s) * 6.2);overflow-y:auto}
+#invpanel.pocket .pright .pchest .slot{width:var(--s);height:var(--s)}
+/* livro aberto: a mochila vai para baixo do bloco, menor */
+#invpanel.pocket .pright .pmini{display:flex;flex-direction:column;align-items:center}
+#invpanel.pocket .pright .pmini .pgrid{grid-template-columns:repeat(9,calc(var(--s) * .78))}#invpanel.pocket .pright .pmini .pgrid .slot{width:calc(var(--s) * .78);height:calc(var(--s) * .78)}
+#invpanel.pocket .pright .pmini .photbar{margin-top:4px}
+#invpanel.pocket .pbook{--s:max(34px, min(calc(var(--ps) * 9 / 5.3), calc((92vh - 200px) / 5.25), 84px));width:calc(var(--ps) * 9);flex:1;min-height:0;border:none;box-shadow:none;padding:0;background:transparent;max-height:none}
+#invpanel.pocket .pbook .rbgrid{grid-template-columns:repeat(5,var(--s));flex:1;align-content:start}
+#invpanel.pocket .wclose{top:6px!important;right:8px!important;z-index:5}`;
   document.head.appendChild(css);
 })();
 // dica de nome do item e item preso no cursor ficam sempre por cima de tudo (inclusive da barra de rolagem)
