@@ -783,7 +783,7 @@ function buildIcons() {
     if (!it) continue; let c;
     if (it.block && BL[it.block].shape === 'door') { c = pixCanvas(64); const g = c.getContext('2d'); g.imageSmoothingEnabled = false; const sx = t => (t % 16) * 16, sy = t => Math.floor(t / 16) * 16; g.drawImage(atlasCanvas, sx(T.door_top), sy(T.door_top), 16, 16, 16, 0, 32, 32); g.drawImage(atlasCanvas, sx(T.door_bottom), sy(T.door_bottom), 16, 16, 16, 32, 32, 32); }
     else if (it.block && BL[it.block].shape === 'bed') c = fromRows(['................', '................', '................', '................', '................', '................', '.WWWW...........', 'KWWWWRRRRRRRRRRK', 'KWWWWRRRRRRRRRRK', 'KRRRRRRRRRRRRRRK', 'KDDDDDDDDDDDDDDK', 'KPPPPPPPPPPPPPPK', 'KP............PK', 'KP............PK', '.K............K.', '................'], { W: [236, 236, 236], R: [176, 34, 34], D: [130, 22, 22], P: [160, 120, 70], K: [60, 40, 20] });
-    else if (it.block) { const b = BL[it.block]; c = isoBlockIcon(b.shape === 'door' ? T.door_top : b.tex.top, b.tex.front !== b.tex.side ? b.tex.front : b.tex.side, b.tex.side, b.cross || b.torch || b.flat); }
+    else if (it.block && !it.icon) { const b = BL[it.block]; c = isoBlockIcon(b.shape === 'door' ? T.door_top : b.tex.top, b.tex.front !== b.tex.side ? b.tex.front : b.tex.side, b.tex.side, b.cross || b.torch || b.flat); }
     else if (it.icon) c = it.icon(); else c = pixCanvas(16);
     it.canvas = c; ICONS[it.id] = c.toDataURL();
   }
@@ -1721,8 +1721,8 @@ window.TREES = (function () {
         for (let dx = -rad; dx <= rad; dx++) for (let dz = -rad; dz <= rad; dz++) { const d = dx * dx + dz * dz; if (d > rad * rad + (rad > 1 ? 1 : 0)) continue; if (d === rad * rad + 1 && t.r() < 0.4) continue; t.leaf(x + dx, ly, z + dz, leaf); } }
       for (let i = 0; i < h; i++) t.log(x, y + i, z, log); },
     // pinheiro de montanha: alto e fino, folhas só em cima
-    pine(t, x, y, z) { const log = B('spruce_log'), leaf = B('spruce_leaves'), h = ri(t, 8, 12), top = y + h;
-      t.leaf(x, top + 1, z, leaf); for (let ly = top; ly >= top - ri(t, 3, 4); ly--) { const rad = ly === top ? 1 : (top - ly) % 2 ? 2 : 1; for (let dx = -rad; dx <= rad; dx++) for (let dz = -rad; dz <= rad; dz++) if (Math.abs(dx) + Math.abs(dz) <= rad + (rad > 1 ? 0 : 0) || (rad === 2 && Math.abs(dx) + Math.abs(dz) <= 3 && t.r() < 0.5)) t.leaf(x + dx, ly, z + dz, leaf); }
+    pine(t, x, y, z) { const log = B('spruce_log'), leaf = B('spruce_leaves'), h = ri(t, 7, 10), top = y + h;
+      t.leaf(x, top + 1, z, leaf); for (let ly = top; ly >= top - ri(t, 4, 6); ly--) { const rad = ly === top ? 1 : (top - ly) % 2 ? 2 : 1; for (let dx = -rad; dx <= rad; dx++) for (let dz = -rad; dz <= rad; dz++) if (Math.abs(dx) + Math.abs(dz) <= rad + (rad > 1 ? 0 : 0) || (rad === 2 && Math.abs(dx) + Math.abs(dz) <= 3 && t.r() < 0.5)) t.leaf(x + dx, ly, z + dz, leaf); }
       for (let i = 0; i < h; i++) t.log(x, y + i, z, log); },
     // pinheiro gigante 2x2 (de 4 mudas em quadrado, ou raro na taiga)
     megaSpruce(t, x, y, z) { const log = B('spruce_log'), leaf = B('spruce_leaves'), h = ri(t, 16, 24), top = y + h, fstart = y + Math.floor(h * 0.5);
@@ -1735,14 +1735,35 @@ window.TREES = (function () {
   return T;
 })();
 
+// ================= GIRASSOL (planta de 2 blocos) — desenho próprio =================
+(function () {
+  const T0 = [0, 0, 0, 0], ST = [74, 130, 40], STd = [56, 104, 30], LF = [92, 156, 48], LFd = [66, 120, 36];
+  retile('sunflower_low', (px, r) => { for (let y = 0; y < 16; y++) for (let x = 0; x < 16; x++) px(x, y, T0);
+    for (let y = 0; y < 16; y++) { px(7, y, ST); px(8, y, STd); }
+    for (const [cx, cy, dir] of [[4, 10, -1], [11, 6, 1], [4, 3, -1]]) for (let i = 0; i < 4; i++) for (let j = 0; j <= Math.min(i, 3 - i) + 1; j++) { px(7 + dir * (i + 1), cy - j + (i > 1 ? 1 : 0), j === 0 ? LFd : LF); }
+    for (let x = 4; x < 12; x++) if (r() < 0.6) px(x, 15, LFd); });
+  retile('sunflower_head', (px, r) => { for (let y = 0; y < 16; y++) for (let x = 0; x < 16; x++) px(x, y, T0);
+    for (let y = 10; y < 16; y++) { px(7, y, ST); px(8, y, STd); } px(6, 13, LF); px(5, 12, LF); px(9, 14, LF); px(10, 13, LF);
+    const cx = 7.5, cy = 6;
+    for (let y = 0; y < 13; y++) for (let x = 0; x < 16; x++) { const d = Math.hypot(x - cx, y - cy), a = Math.atan2(y - cy, x - cx); const petal = 5.6 + Math.cos(a * 8) * 0.9;
+      if (d < 2.6) px(x, y, (x + y) % 2 ? [92, 56, 22] : [70, 40, 16]); else if (d < 3.3) px(x, y, [120, 76, 26]); else if (d < petal) px(x, y, d > petal - 0.8 ? [224, 160, 20] : (r() < 0.2 ? [255, 222, 70] : [250, 200, 36])); } });
+  const add = (id, key, name, o) => { const b = defBlock(id, key, name, o); OPAQ[id] = 0; SOLID[id] = 0; return b; };
+  add(241, 'sunflower', 'Girassol', { solid: false, opaque: false, cross: true, hard: 0, snd: 'grass', t: 'sunflower_low' });
+  add(242, 'sunflower_top', 'Girassol', { solid: false, opaque: false, cross: true, hard: 0, snd: 'grass', t: 'sunflower_head', drop: 'sunflower', creative: false });
+  defItem(241, 'sunflower', 'Girassol', { block: 241, cat: 'blocks' });
+  IT[IID.sunflower].icon = () => { const c = document.createElement('canvas'); c.width = c.height = 16; const g = c.getContext('2d'); g.imageSmoothingEnabled = false; g.drawImage(atlasCanvas, (T.sunflower_head % 16) * 16, Math.floor(T.sunflower_head / 16) * 16, 16, 16, 0, 0, 16, 16); return c; };
+  if (typeof EN !== 'undefined') { EN.sunflower = 'Sunflower'; EN.sunflower_top = 'Sunflower'; }
+  window.SUNFLOWER = [241, 242];
+})();
+
 // ================= MUNDO =================
 const CS = 16, WH = 160, NH = 96, SEA = 40;
 const ckey = (cx, cz) => cx + ',' + cz;
 const B_ = k => BID[k];
 const BIOME = { PLAINS: 0, FOREST: 1, DESERT: 2, SNOW: 3, OCEAN: 4, BEACH: 5, MOUNTAIN: 6 };
 Object.assign(BIOME, { SAVANNA: 7, JUNGLE: 8, SWAMP: 9, BADLANDS: 10, BIRCH: 11 });
-const BIOME_NAMES = ['Planícies', 'Floresta', 'Deserto', 'Taiga Nevada', 'Oceano', 'Praia', 'Montanhas', 'Savana', 'Selva', 'Pântano', 'Terras Áridas', 'Floresta de Bétulas', 'Rio', 'Bosque de Cerejeiras', 'Campos de Cogumelos', 'Floresta Sombria', 'Campo Florido', 'Picos de Gelo', 'Oceano Profundo', 'Oceano Quente', 'Oceano Congelado', 'Taiga'];
-const BIOME_TINT = [[1, 1, 1], [0.9, 1, 0.88], [1.1, 0.98, 0.7], [0.8, 0.92, 0.9], [1, 1, 1], [1, 1, 1], [0.84, 0.95, 0.88], [1.2, 1.0, 0.55], [0.82, 1.12, 0.68], [0.7, 0.76, 0.52], [1.14, 0.94, 0.58], [0.98, 1.06, 0.9], [1, 1, 1], [0.95, 1.08, 0.82], [0.9, 1.0, 0.85], [0.72, 0.92, 0.62], [0.95, 1.1, 0.8], [0.8, 0.92, 0.9], [1, 1, 1], [1, 1, 1], [1, 1, 1]];
+const BIOME_NAMES = ['Planícies', 'Floresta', 'Deserto', 'Taiga Nevada', 'Oceano', 'Praia', 'Montanhas', 'Savana', 'Selva', 'Pântano', 'Terras Áridas', 'Floresta de Bétulas', 'Rio', 'Bosque de Cerejeiras', 'Campos de Cogumelos', 'Floresta Sombria', 'Campo Florido', 'Picos de Gelo', 'Oceano Profundo', 'Oceano Quente', 'Oceano Congelado', 'Taiga', 'Planície de Girassóis'];
+const BIOME_TINT = [[1, 1, 1], [0.9, 1, 0.88], [1.1, 0.98, 0.7], [0.8, 0.92, 0.9], [1, 1, 1], [1, 1, 1], [0.84, 0.95, 0.88], [1.2, 1.0, 0.55], [0.82, 1.12, 0.68], [0.7, 0.76, 0.52], [1.14, 0.94, 0.58], [0.98, 1.06, 0.9], [1, 1, 1], [0.95, 1.08, 0.82], [0.9, 1.0, 0.85], [0.72, 0.92, 0.62], [0.95, 1.1, 0.8], [0.8, 0.92, 0.9], [1, 1, 1], [1, 1, 1], [1, 1, 1], [0.82, 0.94, 0.86], [1.02, 1.06, 0.8]];
 const swampF = (t, w) => clamp((w - 0.12) * 6, 0, 1) * clamp((0.06 - t) * 8, 0, 1) * clamp((t + 0.22) * 8, 0, 1);
 class Chunk {
   constructor(cx, cz) { this.cx = cx; this.cz = cz; this.data = new Uint8Array(CS * CS * WH); this.top = new Uint8Array(256); this.maxY = 0; this.mesh = null; this.wmesh = null; this.dirty = true; this.lights = []; this.genDone = false; }
@@ -1788,7 +1809,7 @@ class World {
     if (cont > -0.1) { const rn = Math.abs(this.nR.n2(qx * 0.0026 + 200, qz * 0.0026 - 200)), km = (1 - ms * 0.85) * ss(-0.1, -0.02, cont); const valley = (1 - ss(0.022, 0.085, rn)) * km, core = (1 - ss(0.004, 0.03, rn)) * km;
       if (valley > 0) h = lerp(h, Math.min(h, SEA + 1.3), valley); if (core > 0) { h = lerp(h, Math.min(h, SEA - 3.6), core); river = core > 0.3; } }
     // gen4: ilhas de cogumelo no meio do oceano aberto
-    let mush = false; if (G4 && cont < -0.1) { const isl = ss(0.64, 0.8, this.nC.n2(x * 0.0035 - 911, z * 0.0035 + 517)) * ss(-0.1, -0.22, cont); if (isl > 0) { const ih = SEA + 1 + isl * (5 + d * 4 + Math.max(0, this.nW.n2(x * 0.03, z * 0.03)) * 5); h = lerp(h, ih, Math.min(1, isl * 1.6)); mush = isl > 0.25; } }
+    let mush = false; const G6m = this.gen >= 6; if (G4 && cont < -0.1 && (!G6m || this.nM.n2(x * 0.0009 + 51, z * 0.0009 - 51) > 0.3)) { const isl = ss(G6m ? 0.76 : 0.64, G6m ? 0.9 : 0.8, this.nC.n2(x * 0.0035 - 911, z * 0.0035 + 517)) * ss(-0.1, -0.22, cont); if (isl > 0) { const ih = SEA + 1 + isl * (5 + d * 4 + Math.max(0, this.nW.n2(x * 0.03, z * 0.03)) * 5); h = lerp(h, ih, Math.min(1, isl * 1.6)); mush = isl > 0.25; } }
     this._tx = x; this._tz = z; return this._t = { h: clamp(Math.floor(h), 4, WH - 8), cont, river, mush };
   }
   heightAt(x, z) {
@@ -1816,7 +1837,7 @@ class World {
       if (t < -0.14) return w < -0.12 ? BIOME.PLAINS : 21;                          // faixa fria: planície ou Taiga
       if (t <= 0.3) { if (h > SEA + 9 && w > -0.08 && w < 0.25 && nV < -0.38 && t > -0.02) return 13; if (w < -0.08 && nV > 0.48 && t > 0) return 16; if (w >= 0.25 && t > 0.0 && t < 0.2) return 15; }
       if (t > 0.3) { if (w < -0.12) return BIOME.DESERT; if (w < 0.18) return this.nM.n2(x * 0.004 + 77, z * 0.004 - 77) > 0.35 ? BIOME.BADLANDS : BIOME.SAVANNA; return BIOME.JUNGLE; }
-      if (t > 0.06) { if (w < -0.08) return BIOME.PLAINS; if (w < 0.25) return BIOME.FOREST; return BIOME.JUNGLE; }
+      if (t > 0.06) { if (w < -0.08) return this.gen >= 6 && nV > 0.4 && t < 0.28 ? 22 : BIOME.PLAINS; if (w < 0.25) return BIOME.FOREST; return BIOME.JUNGLE; }
       if (w < -0.08) return BIOME.PLAINS; if (w < 0.12) return t > -0.1 ? BIOME.BIRCH : BIOME.FOREST; return sf < 0.3 ? BIOME.FOREST : BIOME.SWAMP; }
     if (tS < -0.25) return G3 && nV > 0.42 ? 17 : BIOME.SNOW;
     if (G3 && t <= 0.3) { if (h > SEA + 9 && w > -0.08 && w < 0.25 && nV < -0.38) return 13; if (w < -0.08 && nV > 0.48) return 16; if (w >= 0.25 && t > 0.0 && t < 0.2) return 15; }
@@ -1857,7 +1878,8 @@ class World {
         else if (y < h - 3) id = B_('stone'); else if (y < h - 2 && deep !== B_('stone')) id = deep; else if (y < h) id = fill; else id = top;
         d[(y * 16 + z) * 16 + x] = id;
       }
-      for (let y = h + 1; y <= SEA; y++) d[(y * 16 + z) * 16 + x] = (y === SEA && (temp < -0.38 || bio === 20)) ? B_('ice') : B_('water');
+      const frz = this.gen >= 5 ? (bio === 20 || bio === BIOME.SNOW || bio === 17 || temp + this.nD.n2(wx * 0.045 + 11, wz * 0.045 - 11) * 0.022 < -0.30) : (temp < -0.38 || bio === 20); // gen5+: toda água do frio congela (rios também), sem faixas de água no meio do gelo
+      for (let y = h + 1; y <= SEA; y++) d[(y * 16 + z) * 16 + x] = (y === SEA && frz) ? B_('ice') : B_('water');
     }
     // cavernas: túneis longos de largura variável + cavernas grandes no fundo; poucas aberturas na superfície
     const BR = B_('bedrock'), WAT = B_('water'), STONE = B_('stone'), LAVA = B_('lava'), LAVA_Y = 7; const cA = this.cA, cB = this.cB, cC = this.cC; let maxH = 0;
@@ -1940,11 +1962,12 @@ class World {
       if (h === SEA && (onGrass || SANDS.has(topId) || topId === B_('dirt')) && k > 0.86 && bio !== BIOME.SNOW) { let nearW = false; for (const [dx, dz] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) if (LIQT[get(x + dx, h, z + dz)] === 1) nearW = true; if (nearW) { const n = 1 + (r() * 3 | 0); for (let i = 1; i <= n; i++) set(x, h + i, z, B_('sugarcane')); continue; } }
       if (onGrass) {
         if (bio === BIOME.PLAINS) { if (k < 0.003 && inner(x, z, 2) && !logNear(x, y1, z, 4)) { if (G6 && inner(x, z, 6) && r() < 0.3) TREES.fancyOak(TA, x, y1, z, { maxR: Math.min(x, 15 - x, z, 15 - z) }); else oak(x, y1, z, B_('log'), B_('leaves'), 4 + (r() * 3 | 0)); } else if (k < 0.12) set(x, y1, z, B_('tallgrass')); else if (k < 0.13) set(x, y1, z, B_('dandelion')); else if (k < 0.137) set(x, y1, z, B_('poppy')); else if (k < 0.1375) set(x, y1, z, B_('pumpkin')); }
+        else if (bio === 22) { if (k < 0.002 && inner(x, z, 2) && !logNear(x, y1, z, 5)) oak(x, y1, z, B_('log'), B_('leaves'), 4 + (r() * 3 | 0)); else if (k < 0.1) set(x, y1, z, B_('tallgrass')); else if (k < 0.17 && get(x, y1 + 1, z) === 0) { set(x, y1, z, 241); set(x, y1 + 1, z, 242); } else if (k < 0.18) set(x, y1, z, B_('dandelion')); else if (k < 0.185) set(x, y1, z, B_('oxeye_daisy')); }
         else if (bio === BIOME.FOREST) { if (k < 0.045 && inner(x, z, 2) && !logNear(x, y1, z, 2)) { const birch = hash3(wx, 9, wz, seed) < 0.15; if (G6 && !birch && inner(x, z, 6) && !logNear(x, y1, z, 4) && r() < 0.12) TREES.fancyOak(TA, x, y1, z, { maxR: Math.min(x, 15 - x, z, 15 - z) }); else oak(x, y1, z, birch ? B_('birch_log') : B_('log'), birch ? B_('birch_leaves') : B_('leaves'), (birch ? 5 : 4) + (r() * 3 | 0)); } else if (k < 0.2) set(x, y1, z, B_('tallgrass')); else if (k < 0.205) set(x, y1, z, B_('brown_mushroom')); else if (k < 0.208) set(x, y1, z, B_('red_mushroom')); else if (k < 0.215) set(x, y1, z, B_('poppy')); }
         else if (bio === BIOME.BIRCH) { if (k < 0.04 && inner(x, z, 2) && !logNear(x, y1, z, 2)) { if (G6) TREES.birch(TA, x, y1, z, { tall: r() < 0.15 }); else oak(x, y1, z, B_('birch_log'), B_('birch_leaves'), 5 + (r() * 3 | 0)); } else if (k < 0.16) set(x, y1, z, B_('tallgrass')); else if (k < 0.17) set(x, y1, z, B_('dandelion')); else if (k < 0.175) set(x, y1, z, B_('poppy')); }
         else if (bio === BIOME.SNOW) { if (k < 0.025 && inner(x, z, 2) && !logNear(x, y1, z, 2)) { if (G6) (r() < 0.35 ? TREES.pine : TREES.spruce)(TA, x, y1, z); else spruce(x, y1, z, 6 + (r() * 4 | 0)); } else if (k < 0.05) set(x, y1, z, B_('tallgrass')); }
         else if (bio === 21) { if (k < 0.04 && inner(x, z, 3) && !logNear(x, y1, z, 2)) { if (G6 && mega(x, z) && r() < 0.18 && !logNear(x, y1, z, 5) && get(x + 1, h, z) === topId && get(x, h, z + 1) === topId && get(x + 1, h, z + 1) === topId) TREES.megaSpruce(TA, x, y1, z); else if (G6) (r() < 0.25 ? TREES.pine : TREES.spruce)(TA, x, y1, z); else spruce(x, y1, z, 6 + (r() * 5 | 0)); } else if (k < 0.16) set(x, y1, z, B_('tallgrass')); else if (k < 0.165) set(x, y1, z, B_('brown_mushroom')); }
-        else if (bio === BIOME.MOUNTAIN) { if (k < 0.01 && inner(x, z, 2) && !logNear(x, y1, z, 2)) { if (G6) TREES.pine(TA, x, y1, z); else spruce(x, y1, z, 5 + (r() * 3 | 0)); } }
+        else if (bio === BIOME.MOUNTAIN) { if (k < 0.01 && inner(x, z, 2) && !logNear(x, y1, z, 2)) { if (G6) { if (y1 < SEA + 34) TREES.spruce(TA, x, y1, z, { h: 5 + (r() * 3 | 0) }); } else spruce(x, y1, z, 5 + (r() * 3 | 0)); } }
         else if (bio === BIOME.SAVANNA) { if (k < 0.005 && inner(x, z, 3) && !logNear(x, y1, z, 5)) acacia(x, y1, z); else if (k < 0.32) set(x, y1, z, B_('tallgrass')); }
         else if (bio === BIOME.JUNGLE) { if (k < 0.03 && inner(x, z, 3) && !logNear(x, y1, z, 3)) jungle(x, y1, z, 8 + (r() * 6 | 0)); else if (k < 0.08 && inner(x, z, 1) && !logNear(x, y1, z, 1)) bush(x, y1, z); else if (k < 0.38) set(x, y1, z, B_('tallgrass')); else if (k < 0.385) set(x, y1, z, B_('melon')); }
         else if (bio === 13) { if (k < 0.03 && inner(x, z, 3) && !logNear(x, y1, z, 4)) cherry(x, y1, z); else if (k < 0.2) set(x, y1, z, B_('pink_petals')); else if (k < 0.3) set(x, y1, z, B_('tallgrass')); else if (k < 0.31) set(x, y1, z, B_('allium')); }
@@ -2049,7 +2072,7 @@ class World {
     if (!SOLID[id]) {
       const above = this.getBlock(x, y + 1, z);
       if (above && BL[above].fall) this.settle(x, y + 1, z);
-      else if (above && (BL[above].cross || (BL[above].torch && !wallTorch(this, x, y + 1, z)) || BL[above].boxes === 'rail') && !(above === B_('sugarcane') && id === B_('sugarcane'))) { this.setBlock(x, y + 1, z, 0); if (this.onPop) this.onPop(x, y + 1, z, above); }
+      else if (above && (BL[above].cross || (BL[above].torch && !wallTorch(this, x, y + 1, z)) || BL[above].boxes === 'rail') && !(above === B_('sugarcane') && id === B_('sugarcane')) && !(above === 242 && id === 241)) { this.setBlock(x, y + 1, z, 0); if (this.onPop) this.onPop(x, y + 1, z, above); }
       for (const [dx, dz] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) { const n = this.getBlock(x + dx, y, z + dz); if (!n || !BL[n].torch) continue; const tw = wallTorch(this, x + dx, y, z + dz); if (tw && tw[0] === -dx && tw[1] === -dz) { this.setBlock(x + dx, y, z + dz, 0); if (this.onPop) this.onPop(x + dx, y, z + dz, n); } }
     }
     if (BL[id] && BL[id].fall) this.settle(x, y, z);
@@ -4953,8 +4976,8 @@ const G = {
     }
     this.sky.visible = true;
     const t = this.time / 24000 * Math.PI * 2; const sunH = Math.sin(t); const dayF = clamp((sunH + 0.12) * 2.8, 0, 1);
-    const rf = this.state === 'title' ? 0 : (this.rainF || 0); dayU.value = (0.13 + 0.87 * dayF) * (1 - 0.32 * rf); minU.value = 0.025 + S.brightness / 100 * 0.13;
-    const day = [0.56, 0.74, 1.0], night = [0.015, 0.02, 0.06], grey = [0.40, 0.44, 0.50]; const sk = day.map((v, i) => lerp(lerp(night[i], v, dayF), grey[i] * (0.12 + 0.88 * dayF), rf * 0.9)); this.sun.material.opacity = this.moon.material.opacity = 1 - rf;
+    const rf = this.state === 'title' ? 0 : (this.rainF || 0); const tf = this.state === 'title' ? 0 : (this.thunderF || 0), fl = this.flash || 0; dayU.value = Math.min(1, (0.13 + 0.87 * dayF) * (1 - 0.32 * rf - 0.3 * tf) + fl * 0.55); minU.value = 0.025 + S.brightness / 100 * 0.13;
+    const day = [0.56, 0.74, 1.0], night = [0.015, 0.02, 0.06], grey = [0.40, 0.44, 0.50]; const sk = day.map((v, i) => lerp(lerp(night[i], v, dayF), grey[i] * (0.12 + 0.88 * dayF), rf * 0.9)); this.sun.material.opacity = this.moon.material.opacity = 1 - rf; for (let i = 0; i < 3; i++) sk[i] = sk[i] * (1 - 0.5 * tf) + fl * (0.45 + i * 0.05);
     const sunset = clamp(1 - Math.abs(sunH) * 3.5, 0, 1) * 0.55; const fogC = [lerp(sk[0], 1.0, sunset), lerp(sk[1], 0.55, sunset * 0.8), lerp(sk[2], 0.35, sunset * 0.8)];
     const p = this.player; const underW = p && p.headInWater && this.state !== 'title';
     if (underW) { this.scene.fog.color.setRGB(0.05, 0.15 * dayU.value + 0.03, 0.4 * dayU.value + 0.05); this.scene.background.copy(this.scene.fog.color); this.scene.fog.near = 0.5; this.scene.fog.far = 14; this.wasUnder = true; }
@@ -5466,7 +5489,7 @@ const I18N = (function () {
     Object.assign(IN, { crimson_nylium: 'Crimson Nylium', warped_nylium: 'Warped Nylium', crimson_stem: 'Crimson Stem', warped_stem: 'Warped Stem', crimson_planks: 'Crimson Planks', warped_planks: 'Warped Planks', nether_wart_block: 'Crimson Fungus Block', warped_wart_block: 'Warped Fungus Block', shroomlight: 'Shroomglow', crimson_roots: 'Crimson Roots', warped_roots: 'Warped Roots', soul_soil: 'Soul Soil', bone_block: 'Bone Block', basalt: 'Basalt', blackstone: 'Blackstone', blackstone_bricks: 'Blackstone Bricks', gilded_blackstone: 'Gilded Blackstone', rail: 'Rail', rail_x: 'Rail', cobweb: 'Cobweb', nether_brick_fence: 'Ruby Brick Fence', egg_javardo: 'Hogfolk Spawn Egg', egg_javardo_brute: 'Hogfolk Brute Spawn Egg', saddle: 'Saddle', fishing_rod: 'Fishing Rod', boat: 'Boat', egg_wolf: 'Wolf Spawn Egg', egg_horse: 'Horse Spawn Egg', wheat: 'Wheat', carrot: 'Carrot', potato: 'Potato', baked_potato: 'Baked Potato', bone_meal: 'Bone Meal', fence: 'Oak Fence', dark_fence: 'Dark Oak Fence', fence_gate: 'Oak Fence Gate', fence_gate_open: 'Oak Fence Gate', cobble_wall: 'Rough Stone Wall', egg_boomer: 'Mossbomb Spawn Egg', planks_slab: 'Oak Slab', planks_stairs: 'Oak Stairs', cobble_slab: 'Rough Stone Slab', cobble_stairs: 'Rough Stone Stairs', stone_slab: 'Stone Slab', stone_stairs: 'Stone Stairs', stone_bricks_slab: 'Stone Brick Slab', stone_bricks_stairs: 'Stone Brick Stairs', sandstone_slab: 'Sandstone Slab', sandstone_stairs: 'Sandstone Stairs', bricks_slab: 'Brick Slab', bricks_stairs: 'Brick Stairs', cherry_planks_slab: 'Cherry Slab', cherry_planks_stairs: 'Cherry Stairs', dark_oak_planks_slab: 'Dark Oak Slab', dark_oak_planks_stairs: 'Dark Oak Stairs', shield: 'Shield', totem: 'Totem of Life', ominous_banner: 'Ominous Banner', egg_pillager: 'Pillager Spawn Egg', egg_vindicator: 'Vindicator Spawn Egg', egg_evoker: 'Evoker Spawn Egg', egg_vex: 'Vex Spawn Egg', glass_bottle: 'Glass Bottle', water_bottle: 'Water Bottle', glistering_melon: 'Glistering Melon', milk_bucket: 'Milk Bucket', enchanted_golden_apple: 'Enchanted Golden Apple' });
     window.EFF_EN = { 'Cura Instantânea': 'Instant Health', 'Dano Instantâneo': 'Instant Damage', 'Mau Presságio': 'Bad Omen', 'Herói da Vila': 'Hero of the Village', 'Regeneração': 'Regeneration', 'Absorção': 'Absorption', 'Velocidade': 'Speed', 'Lentidão': 'Slowness', 'Força': 'Strength', 'Fraqueza': 'Weakness', 'Resistência ao Fogo': 'Fire Resistance', 'Resistência': 'Resistance', 'Visão Noturna': 'Night Vision', 'Respiração Aquática': 'Water Breathing', 'Super Pulo': 'Jump Boost', 'Queda Lenta': 'Slow Falling', 'Veneno': 'Poison', 'Fome': 'Hunger' }; }
   const EN_ENCH = { sharpness: 'Keen Edge', knockback: 'Shove', fire_aspect: 'Burning Blade', looting: 'Plunder', efficiency: 'Swiftness', fortune: "Miner's Luck", silk_touch: 'Light Touch', unbreaking: 'Endurance', mending: 'Restoration', protection: 'Plating', feather_falling: 'Soft Landing', respiration: 'Deep Breath', thorns: 'Counterstrike', power: 'Strong Shot', punch: 'Heavy Shot', flame: 'Burning Arrow', infinity: 'Endless Quiver', density: 'Brute Weight', breach: 'Armor Breaker', wind_burst: 'Wind Leap', lunge: 'Dash', aqua: "Diver's Hands", smite: 'Judgment', bane: 'Spider Bane', sweeping: 'Wide Blade', multishot: 'Triple Shot', depth_strider: 'Flippers', frost_walker: 'Frost Step', swift_sneak: 'Sneaky Step', fire_protection: 'Fire Guard', blast_protection: 'Blast Guard', projectile_protection: 'Arrow Guard' };
-  const EXTRA = { 'Multijogador (Wi‑Fi)': 'Multiplayer (Wi‑Fi)', 'Multijogador (Wi-Fi)': 'Multiplayer (Wi-Fi)', 'Pesquisar receitas...': 'Search recipes...', 'Só o que dá para fazer': 'Craftable only', 'Livro de Receitas': 'Recipe Book', 'Nenhuma receita': 'No recipes', 'Precisa da bancada (3×3)': 'Needs a crafting table (3×3)', 'Faltam materiais': 'Missing materials', 'Clique para colocar · Shift: o máximo': 'Click to place · Shift: max', 'Seu escudo foi desativado!': 'Your shield was disabled!', 'Saqueador': 'Pillager', 'Muda de Árvore': 'Tree Sapling', 'Dicas para iniciantes': 'Beginner tips', 'Mostrar as dicas de novo': 'Show tips again', 'Nome do jogador': 'Player name', ' conquistou o progresso [': ' has made the advancement [', 'Clique de novo no cadeado para travar a dificuldade (não dá para desfazer)': 'Click the lock again to lock the difficulty (cannot be undone)', 'No Hardcore não dá para trocar o modo.': 'You cannot change the mode in Hardcore.', 'Este mundo está com os comandos desligados.': 'This world has cheats turned off.', 'Travar a dificuldade': 'Lock difficulty', 'Livro de Receitas': 'Recipe Book', 'Pesquisar receitas...': 'Search recipes...', 'Tem certeza?': 'Are you sure?', 'Sim, trocar': 'Yes, switch', 'Cancelar': 'Cancel', 'Progressos': 'Advancements', 'Progresso feito!': 'Advancement Made!', 'Desafio completo!': 'Challenge Complete!', 'progressos': 'advancements', 'Superfície': 'Overworld', 'Aventura': 'Adventure', 'Abismo': 'Abyss', 'Vazio': 'Void', 'Modo de jogo': 'Game Mode', 'Sobrevivência': 'Survival', 'Criativo': 'Creative', 'Espectador': 'Spectator', 'F4 de novo para trocar': 'Press F4 again to switch', '(travado)': '(locked)', 'Gráficos': 'Video Settings', 'Música e sons': 'Music & Sounds', 'Idioma': 'Language', 'Acessibilidade': 'Accessibility', 'Personalização da skin': 'Skin Customization', 'Créditos e atribuições': 'Credits & Attribution', 'Gráficos...': 'Video Settings...', 'Música e sons...': 'Music & Sounds...', 'Controles...': 'Controls...', 'Idioma...': 'Language...', 'Acessibilidade...': 'Accessibility...', 'Personalização da skin...': 'Skin Customization...', 'Créditos e atribuições...': 'Credits & Attribution...', 'Teclas e botões...': 'Key Binds...', 'Camiseta': 'Shirt', 'Calça': 'Pants', 'Cabelo': 'Hair', 'Pele': 'Skin', 'Restaurar visual': 'Reset look', 'Dificuldade': 'Difficulty', 'Pacífico': 'Peaceful', 'Fácil': 'Easy', 'Difícil': 'Hard', 'Sensibilidade do mouse': 'Mouse Sensitivity', 'Padrão': 'Normal', 'Javardo': 'Hogfolk', 'Javardo Bruto': 'Hogfolk Brute', 'Carrinho com Baú': 'Chest Cart', 'Mina Abandonada': 'Abandoned Mine', 'Fortaleza do Abismo': 'Abyss Fortress', 'Bastião': 'Bastion', 'Lobo': 'Wolf', 'Cavalo': 'Horse', 'Barco': 'Boat', 'Shift para sair do barco': 'Shift to leave the boat', 'Shift para descer · segure Espaço para pular': 'Shift to get off · hold Space to jump', 'Coloque uma Sela para guiar o cavalo · Shift desce': 'Put a Saddle on to steer · Shift to get off', 'Dome o cavalo primeiro: monte nele até ele aceitar.': 'Tame the horse first: keep riding until it accepts you.', 'Cavalo domado! Use uma Sela nele para guiar.': 'Horse tamed! Use a Saddle to steer it.', 'Lobo domado! Clique nele para sentar ou levantar.': 'Wolf tamed! Click it to sit or stand.', 'Musgobomba': 'Mossbomb', 'Trigo': 'Wheat', 'Cenouras': 'Carrots', 'Batatas': 'Potatoes', 'Vingador': 'Vindicator', 'Invocador': 'Evoker', 'Diabrete': 'Vex', 'Mau Presságio': 'Bad Omen', 'Herói da Vila': 'Hero of the Village', 'Mansão Sombria': 'Woodland Mansion', 'Invasão': 'Raid', 'próxima onda em': 'next wave in', 'Onda': 'Wave', 'invasores': 'raiders', 'Uma invasão está chegando! Defenda a vila!': 'A raid is coming! Defend the village!', 'Vitória! Você é o Herói da Vila!': 'Victory! You are the Hero of the Village!', 'A invasão terminou: derrota.': 'The raid ended: defeat.', 'Você recebeu Mau Presságio! Cuidado ao entrar numa vila...': 'You got Bad Omen! Careful entering a village...', 'Porco': 'Pig', Vaca: 'Cow', Galinha: 'Chicken', Ovelha: 'Sheep', Zumbi: 'Zombie', Esqueleto: 'Skeleton', Aranha: 'Spider', 'Serpente do Vazio': 'Void Serpent', 'Vaca-Cogumelo': 'Mooshroom', 'Bosque de Cerejeiras': 'Cherry Grove', 'Campos de Cogumelos': 'Mushroom Fields', 'Floresta Sombria': 'Dark Forest', 'Campo Florido': 'Flower Meadow', 'Picos de Gelo': 'Ice Spikes', 'Oceano Profundo': 'Deep Ocean', 'Oceano Quente': 'Warm Ocean', 'Oceano Congelado': 'Frozen Ocean', 'FÚRIA': 'RAGE', 'Os cristais protegem a Serpente! Quebre-os primeiro.': 'The crystals shield the Serpent! Break them first.', 'A Serpente chama os Vagantes!': 'The Serpent calls the Wanderers!', 'A Serpente ainda está viva.': 'The Serpent is still alive.', 'O Coração só desperta no Vazio. Aqui ele cura quem fica por perto.': 'The Heart only awakens in the Void. Here it heals whoever stays close.', 'Leve o Coração para a ilha central do Vazio.': 'Take the Heart to the central island of the Void.', 'Segure 4 Pérolas do Vazio e toque no Coração para ressuscitar a Serpente.': 'Hold 4 Void Pearls and use the Heart to resurrect the Serpent.', 'A Serpente renascida deixou um tesouro no centro da ilha.': 'The reborn Serpent left a treasure at the center of the island.', 'Vagante do Vazio': 'Void Wanderer', 'Baú do Vazio': 'Void Chest', 'bateu numa parede voando': 'flew into a wall', 'Você atravessou para as ilhas distantes!': 'You crossed to the far islands!', 'De volta à ilha central.': 'Back to the central island.', 'Atravessando o Vazio...': 'Crossing the Void...', 'Nenhuma ilha encontrada.': 'No island found.', 'Um Portal de Passagem surgiu na borda da ilha. Ele leva às ilhas distantes e às Cidades do Vazio.': 'A Passage Gateway appeared at the edge of the island. It leads to the far islands and the Void Cities.', 'Cristal de Cura': 'Healing Crystal', Lutador: 'Fighter', 'Esqueleto Sombrio': 'Shadow Skeleton', 'Espírito de Fogo': 'Fire Spirit', 'Aldeão': 'Villager', 'Planícies': 'Plains', Floresta: 'Forest', Deserto: 'Desert', 'Taiga Nevada': 'Snowy Taiga', Oceano: 'Ocean', Praia: 'Beach', Montanhas: 'Mountains', Fazendeiro: 'Farmer', Ferreiro: 'Blacksmith', 'Bibliotecário': 'Librarian', Arqueiro: 'Fletcher', Vila: 'Village', Masmorra: 'Dungeon', 'Navio naufragado': 'Shipwreck', Peixe: 'Fish', Coelho: 'Rabbit', Morcego: 'Bat', Gosma: 'Slime', Savana: 'Savanna', Selva: 'Jungle', 'Pântano': 'Swamp', 'Terras Áridas': 'Badlands', 'Floresta de Bétulas': 'Birch Forest', Rio: 'River', 'foi esmagado por uma Gosma': 'was squashed by a Slime', 'Abismo': 'Abyss', 'Vazio': 'Void', 'Superfície': 'Surface' };
+  const EXTRA = { 'Planície de Girassóis': 'Sunflower Plains', 'Girassol': 'Sunflower', 'Clima: tempestade com trovões': 'Weather: thunderstorm', 'Multijogador (Wi‑Fi)': 'Multiplayer (Wi‑Fi)', 'Multijogador (Wi-Fi)': 'Multiplayer (Wi-Fi)', 'Pesquisar receitas...': 'Search recipes...', 'Só o que dá para fazer': 'Craftable only', 'Livro de Receitas': 'Recipe Book', 'Nenhuma receita': 'No recipes', 'Precisa da bancada (3×3)': 'Needs a crafting table (3×3)', 'Faltam materiais': 'Missing materials', 'Clique para colocar · Shift: o máximo': 'Click to place · Shift: max', 'Seu escudo foi desativado!': 'Your shield was disabled!', 'Saqueador': 'Pillager', 'Muda de Árvore': 'Tree Sapling', 'Dicas para iniciantes': 'Beginner tips', 'Mostrar as dicas de novo': 'Show tips again', 'Nome do jogador': 'Player name', ' conquistou o progresso [': ' has made the advancement [', 'Clique de novo no cadeado para travar a dificuldade (não dá para desfazer)': 'Click the lock again to lock the difficulty (cannot be undone)', 'No Hardcore não dá para trocar o modo.': 'You cannot change the mode in Hardcore.', 'Este mundo está com os comandos desligados.': 'This world has cheats turned off.', 'Travar a dificuldade': 'Lock difficulty', 'Livro de Receitas': 'Recipe Book', 'Pesquisar receitas...': 'Search recipes...', 'Tem certeza?': 'Are you sure?', 'Sim, trocar': 'Yes, switch', 'Cancelar': 'Cancel', 'Progressos': 'Advancements', 'Progresso feito!': 'Advancement Made!', 'Desafio completo!': 'Challenge Complete!', 'progressos': 'advancements', 'Superfície': 'Overworld', 'Aventura': 'Adventure', 'Abismo': 'Abyss', 'Vazio': 'Void', 'Modo de jogo': 'Game Mode', 'Sobrevivência': 'Survival', 'Criativo': 'Creative', 'Espectador': 'Spectator', 'F4 de novo para trocar': 'Press F4 again to switch', '(travado)': '(locked)', 'Gráficos': 'Video Settings', 'Música e sons': 'Music & Sounds', 'Idioma': 'Language', 'Acessibilidade': 'Accessibility', 'Personalização da skin': 'Skin Customization', 'Créditos e atribuições': 'Credits & Attribution', 'Gráficos...': 'Video Settings...', 'Música e sons...': 'Music & Sounds...', 'Controles...': 'Controls...', 'Idioma...': 'Language...', 'Acessibilidade...': 'Accessibility...', 'Personalização da skin...': 'Skin Customization...', 'Créditos e atribuições...': 'Credits & Attribution...', 'Teclas e botões...': 'Key Binds...', 'Camiseta': 'Shirt', 'Calça': 'Pants', 'Cabelo': 'Hair', 'Pele': 'Skin', 'Restaurar visual': 'Reset look', 'Dificuldade': 'Difficulty', 'Pacífico': 'Peaceful', 'Fácil': 'Easy', 'Difícil': 'Hard', 'Sensibilidade do mouse': 'Mouse Sensitivity', 'Padrão': 'Normal', 'Javardo': 'Hogfolk', 'Javardo Bruto': 'Hogfolk Brute', 'Carrinho com Baú': 'Chest Cart', 'Mina Abandonada': 'Abandoned Mine', 'Fortaleza do Abismo': 'Abyss Fortress', 'Bastião': 'Bastion', 'Lobo': 'Wolf', 'Cavalo': 'Horse', 'Barco': 'Boat', 'Shift para sair do barco': 'Shift to leave the boat', 'Shift para descer · segure Espaço para pular': 'Shift to get off · hold Space to jump', 'Coloque uma Sela para guiar o cavalo · Shift desce': 'Put a Saddle on to steer · Shift to get off', 'Dome o cavalo primeiro: monte nele até ele aceitar.': 'Tame the horse first: keep riding until it accepts you.', 'Cavalo domado! Use uma Sela nele para guiar.': 'Horse tamed! Use a Saddle to steer it.', 'Lobo domado! Clique nele para sentar ou levantar.': 'Wolf tamed! Click it to sit or stand.', 'Musgobomba': 'Mossbomb', 'Trigo': 'Wheat', 'Cenouras': 'Carrots', 'Batatas': 'Potatoes', 'Vingador': 'Vindicator', 'Invocador': 'Evoker', 'Diabrete': 'Vex', 'Mau Presságio': 'Bad Omen', 'Herói da Vila': 'Hero of the Village', 'Mansão Sombria': 'Woodland Mansion', 'Invasão': 'Raid', 'próxima onda em': 'next wave in', 'Onda': 'Wave', 'invasores': 'raiders', 'Uma invasão está chegando! Defenda a vila!': 'A raid is coming! Defend the village!', 'Vitória! Você é o Herói da Vila!': 'Victory! You are the Hero of the Village!', 'A invasão terminou: derrota.': 'The raid ended: defeat.', 'Você recebeu Mau Presságio! Cuidado ao entrar numa vila...': 'You got Bad Omen! Careful entering a village...', 'Porco': 'Pig', Vaca: 'Cow', Galinha: 'Chicken', Ovelha: 'Sheep', Zumbi: 'Zombie', Esqueleto: 'Skeleton', Aranha: 'Spider', 'Serpente do Vazio': 'Void Serpent', 'Vaca-Cogumelo': 'Mooshroom', 'Bosque de Cerejeiras': 'Cherry Grove', 'Campos de Cogumelos': 'Mushroom Fields', 'Floresta Sombria': 'Dark Forest', 'Campo Florido': 'Flower Meadow', 'Picos de Gelo': 'Ice Spikes', 'Oceano Profundo': 'Deep Ocean', 'Oceano Quente': 'Warm Ocean', 'Oceano Congelado': 'Frozen Ocean', 'FÚRIA': 'RAGE', 'Os cristais protegem a Serpente! Quebre-os primeiro.': 'The crystals shield the Serpent! Break them first.', 'A Serpente chama os Vagantes!': 'The Serpent calls the Wanderers!', 'A Serpente ainda está viva.': 'The Serpent is still alive.', 'O Coração só desperta no Vazio. Aqui ele cura quem fica por perto.': 'The Heart only awakens in the Void. Here it heals whoever stays close.', 'Leve o Coração para a ilha central do Vazio.': 'Take the Heart to the central island of the Void.', 'Segure 4 Pérolas do Vazio e toque no Coração para ressuscitar a Serpente.': 'Hold 4 Void Pearls and use the Heart to resurrect the Serpent.', 'A Serpente renascida deixou um tesouro no centro da ilha.': 'The reborn Serpent left a treasure at the center of the island.', 'Vagante do Vazio': 'Void Wanderer', 'Baú do Vazio': 'Void Chest', 'bateu numa parede voando': 'flew into a wall', 'Você atravessou para as ilhas distantes!': 'You crossed to the far islands!', 'De volta à ilha central.': 'Back to the central island.', 'Atravessando o Vazio...': 'Crossing the Void...', 'Nenhuma ilha encontrada.': 'No island found.', 'Um Portal de Passagem surgiu na borda da ilha. Ele leva às ilhas distantes e às Cidades do Vazio.': 'A Passage Gateway appeared at the edge of the island. It leads to the far islands and the Void Cities.', 'Cristal de Cura': 'Healing Crystal', Lutador: 'Fighter', 'Esqueleto Sombrio': 'Shadow Skeleton', 'Espírito de Fogo': 'Fire Spirit', 'Aldeão': 'Villager', 'Planícies': 'Plains', Floresta: 'Forest', Deserto: 'Desert', 'Taiga Nevada': 'Snowy Taiga', Oceano: 'Ocean', Praia: 'Beach', Montanhas: 'Mountains', Fazendeiro: 'Farmer', Ferreiro: 'Blacksmith', 'Bibliotecário': 'Librarian', Arqueiro: 'Fletcher', Vila: 'Village', Masmorra: 'Dungeon', 'Navio naufragado': 'Shipwreck', Peixe: 'Fish', Coelho: 'Rabbit', Morcego: 'Bat', Gosma: 'Slime', Savana: 'Savanna', Selva: 'Jungle', 'Pântano': 'Swamp', 'Terras Áridas': 'Badlands', 'Floresta de Bétulas': 'Birch Forest', Rio: 'River', 'foi esmagado por uma Gosma': 'was squashed by a Slime', 'Abismo': 'Abyss', 'Vazio': 'Void', 'Superfície': 'Surface' };
   Object.assign(IN, window.EXTRA_EN || {});
   for (const it of IT) { if (!it) continue; let en = IN[it.key]; const m = it.key.match(/^(\w+?)_(sword|pickaxe|axe|shovel|hoe|spear|helmet|chest|legs|boots)$/); if (!en && m && MAT[m[1]]) en = MAT[m[1]] + ' ' + TL[m[2]]; if (!en && /^(water|lava)_/.test(it.key)) en = IN[it.key.split('_')[0]]; if (en && !D[it.name]) D[it.name] = en; it.en = en || it.name; }
   for (const k in ENCH) if (EN_ENCH[k]) D[ENCH[k].name] = EN_ENCH[k];
@@ -8280,7 +8303,7 @@ body.touch #actbtn.show{display:block}`;
   // ----- menu: em vez de um mundo de verdade rodando atrás, uma "foto 3D" (panorama em cubo) girando devagar -----
   // as fotos foram tiradas olhando para cada lado; o cubo do three.js troca +X/-X (testado)
   const files = ['nx', 'px', 'py', 'ny', 'pz', 'nz'].map(n => n + '.jpg');
-  const pano = { scene: new THREE.Scene(), cam: new THREE.PerspectiveCamera(70, innerWidth / innerHeight, 0.1, 10), yaw: Math.random() * Math.PI * 2, t: 0, ready: false, fail: false };
+  const pano = { scene: new THREE.Scene(), cam: new THREE.PerspectiveCamera(70, innerWidth / innerHeight, 0.1, 10), yaw: 0, t: 0, ready: false, fail: false };
   pano.tex = new THREE.CubeTextureLoader().setPath('texturas/panorama/').load(files, () => { pano.ready = true; }, undefined, () => { pano.fail = true; });
   pano.scene.background = pano.tex; G.pano = pano;
   const tt = G.toTitle; G.toTitle = function () {
@@ -8296,11 +8319,147 @@ body.touch #actbtn.show{display:block}`;
     if (pano.fail) { this.panoOn = false; tt.call(this); return; }
     if (!pano.ready) return; // tela de carregamento continua até as fotos chegarem
     if (this.booting) { this.booting = 0; const bo = $('#boot'); bo.classList.add('out'); setTimeout(() => { if (!this.booting) bo.classList.add('hidden'); }, 500); }
-    pano.t += dt; pano.yaw += dt * 0.035; const c = pano.cam; c.aspect = innerWidth / innerHeight; c.updateProjectionMatrix(); c.rotation.set(-0.08 + Math.sin(pano.t * 0.11) * 0.04, pano.yaw, 0, 'YXZ');
+    pano.t += dt; pano.yaw = G.booting ? 0 : pano.yaw + dt * 0.035; const c = pano.cam; c.aspect = innerWidth / innerHeight; c.updateProjectionMatrix(); c.rotation.set(-0.08 + Math.sin(pano.t * 0.11) * 0.04, pano.yaw, 0, 'YXZ');
     this.renderer.render(pano.scene, c); };
 })();
 // o jogo já abriu o menu antes deste arquivo carregar: troca o mundo de fundo pela "foto 3D" logo de cara
 (function () { if (window.VM_ASSETS && G.state === 'title' && G.world && G.pano && !G.pano.fail) G.toTitle(); })();
+
+// ================= CHAT E COMANDOS (tela própria): barra de cima, histórico, sugestões, lista de comandos prontos =================
+// O teclado do celular/tablet não mexe no jogo: só a barra de digitar sobe junto com o teclado.
+(function () {
+  const en = () => S.lang === 'en', L = (pt, e) => en() ? e : pt;
+  // ---------- lista de comandos (nome, uso, descrição pt, descrição en, valores para sugerir) ----------
+  const MOBS = () => Object.keys(typeof MOB_TYPES !== 'undefined' ? MOB_TYPES : {}), ITEMS = () => (typeof IT !== 'undefined' ? IT : []).filter(i => i && i.key).map(i => i.key);
+  const CMDS = [
+    ['gamemode', '<survival|creative|spectator>', 'Muda o modo de jogo', 'Change game mode', [['survival', 'creative', 'spectator']]],
+    ['time', 'set <day|noon|night|midnight|n>', 'Muda a hora do dia', 'Change the time of day', [['set'], ['day', 'noon', 'night', 'midnight', 'sunrise', 'sunset']]],
+    ['weather', '<clear|rain|thunder>', 'Muda o clima', 'Change the weather', [['clear', 'rain', 'thunder']]],
+    ['give', '<item> [quantidade]', 'Dá um item para você', 'Give yourself an item', [ITEMS, ['1', '16', '32', '64']]],
+    ['summon', '<criatura> [x y z]', 'Invoca uma criatura', 'Summon a mob', [MOBS]],
+    ['tp', '<x> <y> <z>', 'Teleporta (~ = a partir de onde você está)', 'Teleport (~ = relative)', [['~'], ['~'], ['~']]],
+    ['kill', '[@e]', 'Você morre (com @e remove as criaturas)', 'Kill yourself (@e removes mobs)', [['@e']]],
+    ['heal', '', 'Recupera toda a vida', 'Restore health', []],
+    ['feed', '', 'Mata a fome', 'Restore hunger', []],
+    ['clear', '', 'Limpa o inventário', 'Clear inventory', []],
+    ['xp', '<quantidade> [levels]', 'Ganha experiência', 'Add experience', [['10', '100', '1000'], ['levels']]],
+    ['difficulty', '<peaceful|easy|normal|hard>', 'Muda a dificuldade', 'Change difficulty', [['peaceful', 'easy', 'normal', 'hard']]],
+    ['spawnpoint', '', 'Renasce onde você está', 'Set respawn here', []],
+    ['fly', '', 'Liga ou desliga o voo', 'Toggle flying', []],
+    ['locate', '<vila|masmorra|navio|mansao|mina|fortaleza|bastiao>', 'Mostra a estrutura mais perto', 'Find the nearest structure', [['vila', 'masmorra', 'navio', 'mansao', 'mina', 'fortaleza', 'bastiao']]],
+    ['dimension', '<overworld|nether|end>', 'Vai para outra dimensão', 'Go to another dimension', [['overworld', 'nether', 'end']]],
+    ['attribute', '@s <atributo> base set <valor>', 'Muda um atributo (tamanho, velocidade...)', 'Change an attribute (scale, speed...)', [['@s'], () => Object.keys(typeof ATTR_DEF !== 'undefined' ? ATTR_DEF : {}), ['base'], ['set', 'get', 'reset']]],
+    ['raio', '', 'Solta um raio na sua frente', 'Strike lightning ahead', []],
+    ['pvp', '<1-8> [0-3] | kit | stop', 'Luta contra bots', 'Fight bots', [['1', '2', '3', 'kit', 'stop']]],
+    ['seed', '', 'Mostra a semente do mundo', 'Show world seed', []],
+    ['items', '', 'Lista todos os itens', 'List all items', []],
+    ['mobs', '', 'Lista todas as criaturas', 'List all mobs', []],
+    ['players', '', 'Quem está jogando (multijogador)', 'Who is online (multiplayer)', []],
+    ['kick', '<jogador>', 'Expulsa um jogador (dono)', 'Kick a player (host)', []],
+    ['mute', '<jogador> [minutos]', 'Deixa um jogador mudo (dono)', 'Mute a player (host)', []],
+    ['help', '', 'Ajuda', 'Help', []]
+  ];
+  // comandos prontos (botão da lista)
+  const READY = () => [
+    [L('Hora', 'Time'), ['/time set day', '/time set noon', '/time set night', '/time set midnight']],
+    [L('Clima', 'Weather'), ['/weather clear', '/weather rain', '/weather thunder', '/raio']],
+    [L('Modo de jogo', 'Game mode'), ['/gamemode survival', '/gamemode creative', '/gamemode spectator', '/fly']],
+    [L('Jogador', 'Player'), ['/heal', '/feed', '/clear', '/xp 30 levels', '/spawnpoint', '/kill']],
+    [L('Itens', 'Items'), ['/give diamond 64', '/give iron_ingot 64', '/give torch 64', '/give bread 32']],
+    [L('Criaturas', 'Mobs'), ['/summon pig', '/summon cow', '/summon zombie', '/kill @e']],
+    [L('Mundo', 'World'), ['/difficulty peaceful', '/difficulty normal', '/locate vila', '/seed']]
+  ];
+  // ---------- tela ----------
+  const st = document.createElement('style'); st.textContent = `
+#chatbox{position:fixed!important;inset:0!important;left:0!important;right:0!important;bottom:0!important;z-index:60!important;pointer-events:none}
+#chatbox>*{pointer-events:auto}
+#chTop{position:absolute;top:calc(8px + env(safe-area-inset-top));left:calc(8px + env(safe-area-inset-left));right:calc(8px + env(safe-area-inset-right));height:44px;display:flex;align-items:center;background:#c6c6c6;border:2px solid #000;box-shadow:inset 2px 2px 0 #fff,inset -2px -2px 0 #8b8b8b;color:#333;font-size:24px}
+#chTop .tt{position:absolute;left:0;right:0;text-align:center;pointer-events:none}
+#chBack{position:relative;z-index:1;height:100%;display:flex;align-items:center;gap:8px;padding:0 12px;background:none;border:none;font:inherit;font-size:22px;color:#333;cursor:pointer}
+#chBack i{width:22px;height:22px;background:#3a3a3a;border:2px solid #000;display:inline-block;clip-path:polygon(0 50%,55% 0,55% 30%,100% 30%,100% 70%,55% 70%,55% 100%)}
+#chHist{position:absolute;left:calc(8px + env(safe-area-inset-left));top:calc(62px + env(safe-area-inset-top));bottom:calc(var(--kb,0px) + 66px);width:min(620px,70vw);overflow:auto;display:flex;flex-direction:column;justify-content:flex-end;font-size:20px;pointer-events:auto;scrollbar-width:thin}
+#chHist div{background:rgba(0,0,0,.5);padding:1px 8px;text-shadow:1px 1px #222;word-break:break-word}
+#chSug{position:absolute;z-index:2;left:calc(8px + env(safe-area-inset-left));bottom:calc(var(--kb,0px) + 64px);max-height:min(60vh,calc(100vh - var(--kb,0px) - 140px));width:min(640px,calc(100vw - 16px));overflow:auto;display:none;flex-direction:column;background:rgba(12,12,12,.94);border:2px solid #000}
+#chSug .hint{position:sticky;top:0;background:#141414;z-index:1;padding:5px 10px;color:#ffeb7a;font-size:19px;border-bottom:1px solid #444;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+#chSug .sg{padding:6px 10px;font-size:20px;color:#fff;cursor:pointer;display:flex;gap:10px;align-items:baseline;flex:none}
+#chSug .sg small{color:#aaa;font-size:16px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+#chSug .sg.on,#chSug .sg:hover,#chSug .sg.prs{background:#3a5a2a}
+#chSug .grp{padding:6px 10px 2px;color:#ffeb7a;font-size:17px;flex:none}
+#chBar{position:absolute;left:calc(8px + env(safe-area-inset-left));right:calc(8px + env(safe-area-inset-right));bottom:calc(var(--kb,0px) + 8px);height:50px;display:flex;gap:6px}
+#chBar .cb{width:50px;flex:none;background:#c6c6c6;border:2px solid #000;box-shadow:inset 2px 2px 0 #fff,inset -2px -2px 0 #8b8b8b;color:#333;font:inherit;font-size:28px;cursor:pointer;display:flex;align-items:center;justify-content:center;padding:0}
+#chBar .cb.prs,#chBar .cb:active{background:#a9a9a9}
+#chBar .cb.on{background:#9fd27a}
+#chBar #chatin{flex:1;min-width:0;height:100%;box-sizing:border-box;background:rgba(0,0,0,.92);border:2px solid #a0a0a0;color:#fff;font-size:24px;padding:0 10px}
+#chBar #chatin:focus{border-color:#fff}
+.chTri{width:0;height:0;border-left:9px solid transparent;border-right:9px solid transparent;border-top:11px solid #333}
+.chArr{width:22px;height:20px;background:#333;clip-path:polygon(0 35%,55% 35%,55% 0,100% 50%,55% 100%,55% 65%,0 65%)}
+body.chopen #touchui,body.chopen #chatlog,body.chopen #itemname,body.chopen #hotbar,body.chopen #bars{visibility:hidden!important}
+@media (max-height:500px){#chTop{height:38px;font-size:21px}#chHist{top:calc(52px + env(safe-area-inset-top));font-size:18px}#chBar{height:44px}#chBar .cb{width:44px}#chSug{bottom:calc(var(--kb,0px) + 58px)}}`;
+  document.head.appendChild(st);
+  const box = document.getElementById('chatbox'), inp = document.getElementById('chatin'); if (!box || !inp) return;
+  box.innerHTML = ''; box.dataset.noi18n = '1';
+  const top = document.createElement('div'); top.id = 'chTop'; top.innerHTML = `<button id="chBack"><i></i><span></span></button><div class="tt"></div>`;
+  const hist = document.createElement('div'); hist.id = 'chHist';
+  const sug = document.createElement('div'); sug.id = 'chSug';
+  const bar = document.createElement('div'); bar.id = 'chBar';
+  const bList = document.createElement('button'); bList.className = 'cb'; bList.innerHTML = '<span class="chTri"></span>';
+  const bSlash = document.createElement('button'); bSlash.className = 'cb'; bSlash.textContent = '/';
+  const bSend = document.createElement('button'); bSend.className = 'cb'; bSend.innerHTML = '<span class="chArr"></span>';
+  bar.append(bList, bSlash, inp, bSend); box.append(top, hist, sug, bar);
+  inp.removeAttribute('placeholder');
+  const texts = () => { top.querySelector('span').textContent = L('Voltar', 'Back'); top.querySelector('.tt').textContent = L('Chat e Comandos', 'Chat and Commands'); inp.placeholder = L('Digite uma mensagem ou /comando', 'Type a message or /command'); bList.title = L('Comandos prontos', 'Ready commands'); bSend.title = L('Enviar', 'Send'); };
+  // nada de botões de toque roubando o foco do campo
+  for (const b of [bList, bSlash, bSend, top.querySelector('#chBack')]) b.addEventListener('pointerdown', e => e.preventDefault());
+  // ---------- histórico ----------
+  function drawHist() { hist.innerHTML = (UI.chatLines || []).map(l => '<div>' + l.h + '</div>').join(''); hist.scrollTop = hist.scrollHeight; }
+  const ch0 = UI.chat.bind(UI); UI.chat = function () { const r = ch0.apply(this, arguments); if (UI.chatOpen) drawHist(); return r; };
+  // ---------- sugestões ----------
+  let listMode = false, sel = -1, items = [];
+  const vals = v => typeof v === 'function' ? v() : v;
+  function show(rows, hint) { sug.innerHTML = ''; items = rows; sel = -1;
+    if (hint) { const h = document.createElement('div'); h.className = 'hint'; h.textContent = hint; sug.appendChild(h); }
+    for (const r of rows) { if (r.grp) { const g = document.createElement('div'); g.className = 'grp'; g.textContent = r.grp; sug.appendChild(g); continue; }
+      const d = document.createElement('div'); d.className = 'sg'; d.innerHTML = `<span></span><small></small>`; d.firstChild.textContent = r.t; d.lastChild.textContent = r.d || ''; d.addEventListener('pointerdown', e => e.preventDefault()); d.addEventListener('click', () => pick(r)); r.el = d; sug.appendChild(d); }
+    sug.style.display = rows.length || hint ? 'flex' : 'none'; }
+  function pick(r) { Snd.play('click'); inp.value = r.v; listMode = false; bList.classList.remove('on'); inp.focus(); try { inp.setSelectionRange(r.v.length, r.v.length); } catch (e) { } update(); }
+  function update() {
+    if (listMode) return showList(); const v = inp.value; if (v[0] !== '/') { show([]); return; }
+    const parts = v.slice(1).split(' '), name = parts[0].toLowerCase();
+    if (parts.length === 1) { const rows = CMDS.filter(c => c[0].startsWith(name)).map(c => ({ t: '/' + c[0] + ' ' + c[1], d: L(c[2], c[3]), v: '/' + c[0] + ' ' })); show(rows.slice(0, 40)); return; }
+    const c = CMDS.find(c => c[0] === name); if (!c) { show([]); return; }
+    const ai = parts.length - 2, cur = parts[parts.length - 1].toLowerCase(), opts = c[4][ai] ? vals(c[4][ai]) : [];
+    const before = '/' + parts.slice(0, -1).join(' ') + ' ';
+    const rows = opts.filter(o => o.toLowerCase().startsWith(cur) && o.toLowerCase() !== cur).slice(0, 60).map(o => ({ t: o, v: before + o + ' ' }));
+    show(rows, '/' + c[0] + ' ' + c[1] + '  —  ' + L(c[2], c[3]));
+  }
+  function showList() { const rows = []; for (const [g, cs] of READY()) { rows.push({ grp: g }); for (const c of cs) { const k = CMDS.find(x => x[0] === c.slice(1).split(' ')[0]); rows.push({ t: c, d: k ? L(k[2], k[3]) : '', v: c }); } } show(rows, L('Comandos prontos: toque para usar', 'Ready commands: tap to use')); }
+  inp.addEventListener('input', () => { listMode = false; bList.classList.remove('on'); update(); });
+  inp.addEventListener('keydown', e => { const rows = items.filter(r => !r.grp); if (!rows.length) return;
+    if (e.key === 'ArrowDown' || e.key === 'ArrowUp') { e.preventDefault(); sel = (sel + (e.key === 'ArrowDown' ? 1 : -1) + rows.length) % rows.length; rows.forEach((r, i) => r.el.classList.toggle('on', i === sel)); rows[sel].el.scrollIntoView({ block: 'nearest' }); }
+    else if (e.key === 'Tab') { e.preventDefault(); pick(rows[Math.max(0, sel)]); }
+    else if (e.key === 'Enter' && sel >= 0) { e.preventDefault(); e.stopImmediatePropagation(); pick(rows[sel]); } }, true);
+  bList.addEventListener('click', () => { Snd.play('click'); listMode = !listMode; bList.classList.toggle('on', listMode); if (listMode) showList(); else update(); });
+  bSlash.addEventListener('click', () => { Snd.play('click'); if (inp.value[0] !== '/') inp.value = '/' + inp.value; inp.focus(); listMode = false; bList.classList.remove('on'); update(); });
+  const send = () => { const v = inp.value.trim(); inp.value = ''; show([]); if (v) { G.chatSubmit(v); drawHist(); } };
+  bSend.addEventListener('click', () => { Snd.play('click'); send(); if (!touchOn()) UI.closeChat(); });
+  top.querySelector('#chBack').addEventListener('click', () => { Snd.play('click'); UI.closeChat(); });
+  // no toque, Enter envia e o chat continua aberto (igual ao celular); no PC fecha
+  inp.addEventListener('keydown', e => { if (e.key === 'Enter' && touchOn()) { e.preventDefault(); e.stopImmediatePropagation(); send(); } }, true);
+  // ---------- abrir / fechar ----------
+  const oc = UI.openChat.bind(UI), cc = UI.closeChat.bind(UI);
+  UI.openChat = function (prefix) { texts(); listMode = false; bList.classList.remove('on'); document.body.classList.add('chopen'); const r = oc(prefix); drawHist(); update(); return r; };
+  UI.closeChat = function () { document.body.classList.remove('chopen'); show([]); setKb(0); return cc(); };
+  // ---------- teclado: o jogo fica parado, só a barra sobe ----------
+  let kb = 0, baseW = innerWidth, baseH = innerHeight;
+  function setKb(px) { kb = Math.max(0, Math.round(px)); document.documentElement.style.setProperty('--kb', kb + 'px'); }
+  window.vmKb = px => { setKb(UI.chatOpen ? px : 0); }; // o app Android manda a altura do teclado
+  const typing = () => { const a = document.activeElement; return a && (a.tagName === 'INPUT' || a.tagName === 'TEXTAREA'); };
+  if (window.visualViewport) visualViewport.addEventListener('resize', () => { if (window.VM_NATIVE_KB) return; const vv = visualViewport, h = innerHeight - vv.height - vv.offsetTop; setKb(UI.chatOpen && h > 60 ? h : 0); });
+  // navegador que encolhe a página: o jogo não muda de tamanho enquanto o teclado está aberto
+  const rs = G.resize; G.resize = function () { if (typing() && innerWidth === baseW && innerHeight < baseH) return; baseW = innerWidth; baseH = innerHeight; return rs.apply(this, arguments); };
+  addEventListener('scroll', () => { if (scrollX || scrollY) scrollTo(0, 0); });
+  document.addEventListener('focusout', () => setTimeout(() => { if (!typing() && (innerHeight !== baseH || innerWidth !== baseW)) G.resize(); }, 300));
+})();
 
 // ===== FORNALHA: chama de verdade (desenho de pixel) que vai apagando, seta que enche e casas maiores =====
 (function () {
@@ -8321,6 +8480,23 @@ body.touch #actbtn.show{display:block}`;
   document.head.appendChild(st);
   // liga a animação da chama quando está queimando
   const uf = UI.updateFurnaceUI; UI.updateFurnaceUI = function () { const r = uf.apply(this, arguments); const c = this.container, fl = document.querySelector('.flame'); if (fl && c) fl.classList.toggle('on', c.burn > 0); return r; };
+})();
+
+// ================= SOM ABAFADO: longe ou atrás de blocos (cavernas, paredes) o som perde os agudos =================
+(function () {
+  let pend = null, pendT = 0;
+  // quantos blocos sólidos há entre o ouvido e o som (até 32 passos)
+  function walls(a, b) { const w = G.world; if (!w) return 0; const ex = a.x, ey = a.y + 1.6, ez = a.z, dx = b.x - ex, dy = b.y + 0.5 - ey, dz = b.z - ez, L = Math.hypot(dx, dy, dz); if (L < 1.5) return 0;
+    const n = Math.min(32, Math.ceil(L)); let c = 0, last = ''; for (let i = 1; i < n; i++) { const f = i / n, x = Math.floor(ex + dx * f), y = Math.floor(ey + dy * f), z = Math.floor(ez + dz * f), k = x + ',' + y + ',' + z; if (k === last) continue; last = k; if (OPAQ[w.getBlock(x, y, z)]) c++; } return c; }
+  const v0 = G.vol; G.vol = function (pos) { const v = v0.call(this, pos); try { if (this.player && pos && v > 0) { const d = this.player.pos.distanceTo(pos), c = walls(this.player.pos, pos);
+    let f = 20000 * Math.exp(-Math.max(0, d - 4) / 9); f = f / Math.pow(2.4, Math.min(c, 6)); f = Math.max(320, f); pend = f < 15000 ? { f, q: c } : null; pendT = performance.now(); } } catch (e) { pend = null; } return pend ? v * (pend.q ? Math.max(0.35, 1 - pend.q * 0.12) : 1) : v; };
+  const pl = Snd.play.bind(Snd);
+  Snd.play = function (name, vol) {
+    if (!pend || performance.now() - pendT > 4 || !this.ctx || !this.master) { pend = null; return pl(name, vol); }
+    const real = this.master, lp = this.ctx.createBiquadFilter(); lp.type = 'lowpass'; lp.frequency.value = pend.f; lp.Q.value = 0.5; lp.connect(real);
+    const rev = this.sfxRev; this.master = lp; if (rev && pend.q) this.sfxRev = lp; // atrás da parede: sem eco "aberto"
+    try { return pl(name, vol); } finally { this.master = real; this.sfxRev = rev; } };
+  const mt = Snd.mat && Snd.mat.bind(Snd); if (mt) Snd.mat = function () { if (!pend || performance.now() - pendT > 4) return mt.apply(this, arguments); const real = this.master, lp = this.ctx.createBiquadFilter(); lp.type = 'lowpass'; lp.frequency.value = pend.f; lp.connect(real); this.master = lp; try { return mt.apply(this, arguments); } finally { this.master = real; } };
 })();
 
 // ===== REGRAS GLOBAIS: quando uma tela está aberta (inventário, baú, chat, pausa, morte), nada acontece no mundo =====
@@ -8348,6 +8524,25 @@ body.touch #actbtn.show{display:block}`;
   cv.addEventListener('touchstart', () => { if (G.worldLocked()) G.needLift = true; else G.needLift = false; }, { passive: true, capture: true });
   // perder o foco (trocar de app, notificação) solta tudo
   window.addEventListener('blur', () => clearActs(G)); document.addEventListener('visibilitychange', () => { if (document.hidden) clearActs(G); });
+})();
+
+// ================= REGRA GLOBAL: criatura só nasce onde cabe inteira (largura x altura) =================
+(function () {
+  const fits = (e, x, y, z) => { const w = G.world, hw = e.w || 0.3, h = e.h || 1;
+    for (let bx = Math.floor(x - hw + 0.01); bx <= Math.floor(x + hw - 0.01); bx++) for (let bz = Math.floor(z - hw + 0.01); bz <= Math.floor(z + hw - 0.01); bz++) for (let by = Math.floor(y + 0.01); by <= Math.floor(y + h - 0.01); by++) { const id = w.getBlock(bx, by, bz); if (SOLID[id] || (LIQT[id] === 2)) return false; }
+    return true; };
+  window.mobFits = fits;
+  // tenta um lugar livre bem pertinho (o centro de um bloco vizinho ou um bloco acima); se não der, a criatura não nasce
+  function settle(e) { const x0 = e.pos.x, y0 = e.pos.y, z0 = e.pos.z; if (fits(e, x0, y0, z0)) return true;
+    const cx = Math.floor(x0) + 0.5, cz = Math.floor(z0) + 0.5;
+    for (const dy of [0, 1]) for (const [dx, dz] of [[0, 0], [1, 0], [-1, 0], [0, 1], [0, -1], [1, 1], [-1, -1], [1, -1], [-1, 1]]) { const x = cx + dx, y = Math.floor(y0) + dy, z = cz + dz;
+      if (fits(e, x, y, z) && SOLID[G.world.getBlock(Math.floor(x), y - 1, Math.floor(z))]) { e.pos.set(x, y, z); return true; } }
+    return false; }
+  const st = G.spawnTick; G.spawnTick = function () {
+    const before = new Set(this.entities); const r = st.apply(this, arguments);
+    for (const e of this.entities) if (!before.has(e) && e instanceof Mob && !e.T.water && !e.T.fly && !e.T.flying && !e.dead) { if (!settle(e)) e.remove(); }
+    for (let i = this.entities.length - 1; i >= 0; i--) if (this.entities[i].dead && !before.has(this.entities[i])) this.entities.splice(i, 1);
+    return r; };
 })();
 
 // ===== MUNDOS EM PASTA =====
@@ -8603,6 +8798,75 @@ body.touch #actbtn.show{display:block}`;
 
 ;(function(){ if (!window.I18N) return; const ap = I18N.apply; I18N.apply = function(){ const r = ap.apply(this, arguments); try { const wh = document.getElementById('wsWhere'); if (wh && window.WorldStore) wh.textContent = (S.lang==='en'?'Worlds saved in: ':'Mundos salvos em: ') + WorldStore.where(); } catch(e){} return r; }; })();
 ;(function(){ const sh = UI.show.bind(UI); UI.show = function(id){ const r = sh.apply(null, arguments); if (id === 's-worlds') try { const wh = document.getElementById('wsWhere'); if (wh) wh.textContent = (S.lang==='en'?'Worlds saved in: ':'Mundos salvos em: ') + WorldStore.where(); } catch(e){} return r; }; })();
+
+// ================= girassol: os 2 blocos andam juntos =================
+(function () {
+  const LO = 241, HI = 242;
+  const bc = G.blockChanged; G.blockChanged = function (x, y, z, o, n) { const r = bc.apply(this, arguments); const w = this.world; if (!w) return r;
+    if (n === LO && o !== LO) { const up = w.getBlock(x, y + 1, z); if (!up || (BL[up] && BL[up].replace && up !== HI)) w.setBlock(x, y + 1, z, HI); }
+    if (o === LO && n !== LO && w.getBlock(x, y + 1, z) === HI) w.setBlock(x, y + 1, z, 0);
+    if (o === HI && n !== HI && w.getBlock(x, y - 1, z) === LO) w.setBlock(x, y - 1, z, 0);
+    return r; };
+})();
+
+// ================= TEMPESTADE COM TROVÕES: céu escuro, raios, clarão, trovão, fogo =================
+(function () {
+  G.thundering = false; G.thunderF = 0; G.flash = 0;
+  const bolts = [];
+  const mat = new THREE.MeshBasicMaterial({ color: 0xdfe8ff, transparent: true, opacity: 1, blending: THREE.AdditiveBlending, depthWrite: false, fog: false });
+  const glow = new THREE.MeshBasicMaterial({ color: 0x8fa8ff, transparent: true, opacity: 0.35, blending: THREE.AdditiveBlending, depthWrite: false, fog: false });
+  const BOX = new THREE.BoxGeometry(1, 1, 1);
+  // raio: linha em zigue-zague do céu até o chão, com galhinhos
+  function makeBolt(x, y, z) {
+    const grp = new THREE.Group(); const top = y + 90; let px = x, py = top, pz = z;
+    const seg = (ax, ay, az, bx, by, bz, w) => { const dx = bx - ax, dy = by - ay, dz = bz - az, L = Math.hypot(dx, dy, dz); const m = new THREE.Mesh(BOX, mat); m.scale.set(w, L, w); m.position.set((ax + bx) / 2, (ay + by) / 2, (az + bz) / 2); m.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), new THREE.Vector3(dx / L, dy / L, dz / L)); grp.add(m); const g = new THREE.Mesh(BOX, glow); g.scale.set(w * 4, L, w * 4); g.position.copy(m.position); g.quaternion.copy(m.quaternion); grp.add(g); };
+    while (py > y) { const ny = Math.max(y, py - (3 + Math.random() * 5)), f = (ny - y) / (top - y); const nx = x + (Math.random() - 0.5) * 6 * f, nz = z + (Math.random() - 0.5) * 6 * f; seg(px, py, pz, nx, ny, nz, 0.32);
+      if (Math.random() < 0.18 && ny > y + 12) { let bx = nx, by = ny, bz = nz; const dx = (Math.random() - 0.5) * 2, dz = (Math.random() - 0.5) * 2; for (let i = 0; i < 3; i++) { const cx = bx + dx * 2.5 + (Math.random() - 0.5), cy = by - 2 - Math.random() * 3, cz = bz + dz * 2.5 + (Math.random() - 0.5); seg(bx, by, bz, cx, cy, cz, 0.18); bx = cx; by = cy; bz = cz; } }
+      px = nx; py = ny; pz = nz; }
+    G.scene.add(grp); bolts.push({ g: grp, t: 0.45 });
+  }
+  // som do trovão: estalo perto, ronco grave e longo longe
+  function thunderSound(dist) {
+    const c = Snd.ctx; if (!c || !Snd.nb) return; const vol = Math.max(0.15, Math.min(1, 1.3 - dist / 90)) * (S.sfx === undefined ? 1 : S.sfx / 100) * (S.master === undefined ? 1 : S.master / 100), t0 = c.currentTime + Math.min(2.5, dist / 60);
+    const band = (f0, f1, dur, v, delay, type) => { const s = c.createBufferSource(); s.buffer = Snd.nb; s.loop = true; const fl = c.createBiquadFilter(); fl.type = type || 'lowpass'; fl.frequency.setValueAtTime(f0, t0 + delay); fl.frequency.exponentialRampToValueAtTime(f1, t0 + delay + dur); const g = c.createGain(); g.gain.setValueAtTime(0.0001, t0 + delay); g.gain.exponentialRampToValueAtTime(v, t0 + delay + 0.03); g.gain.exponentialRampToValueAtTime(0.0001, t0 + delay + dur); s.connect(fl); fl.connect(g); g.connect(Snd.master); s.start(t0 + delay); s.stop(t0 + delay + dur + 0.1); };
+    if (dist < 40) band(4000, 600, 0.35, 0.9 * vol, 0, 'lowpass');
+    band(420, 60, 3.2, 0.9 * vol, 0.05); band(240, 40, 4.5, 0.7 * vol, 0.35); band(160, 35, 5.5, 0.55 * vol, 1.1);
+  }
+  G.strike = function (x, z, y) {
+    const w = this.world; if (!w) return; x = Math.floor(x); z = Math.floor(z); if (y === undefined) y = w.topAt(x, z) + 1;
+    makeBolt(x + 0.5, y, z + 0.5); this.flash = 1; const p = this.player, d = Math.hypot(p.pos.x - x, p.pos.z - z); thunderSound(d);
+    // fogo e dano no lugar do raio
+    if (this.difficulty > 0 && Math.random() < 0.7) try { FireSys.ignite(x, y, z); } catch (e) { }
+    for (const e of this.entities) if (e instanceof Mob && !e.dying && Math.hypot(e.pos.x - x - 0.5, e.pos.z - z - 0.5) < 3 && Math.abs(e.pos.y - y) < 4) { e.hurt(5, null, null); e.fireT = 8; }
+    if (!p.dead && Math.hypot(p.pos.x - x - 0.5, p.pos.z - z - 0.5) < 3 && Math.abs(p.pos.y - y) < 4) { p.damage(5, 'lightning'); p.fireT = 8; }
+  };
+  // tempo
+  let nextT = 6;
+  const up = G.tick; G.tick = function (dt) {
+    const wasRain = this.raining; const r = up.apply(this, arguments);
+    if (this.state === 'play' && this.world) {
+      if (this.raining && !wasRain && this.dim === 'overworld') this.thundering = Math.random() < 0.3; // chuva nova: às vezes vira tempestade
+      if (!this.raining) this.thundering = false;
+      const on = this.thundering && this.dim === 'overworld'; this.thunderF += ((on ? 1 : 0) - this.thunderF) * Math.min(1, dt * 0.4);
+      if (on && this.rainF > 0.6) { nextT -= dt; if (nextT <= 0) { nextT = 4 + Math.random() * 14; const p = this.player, a = Math.random() * Math.PI * 2, rr = 8 + Math.random() * 70; this.strike(p.pos.x + Math.cos(a) * rr, p.pos.z + Math.sin(a) * rr); } }
+    }
+    if (this.thunderHold) return r; // só para testes
+    for (let i = bolts.length - 1; i >= 0; i--) { const b = bolts[i]; b.t -= dt; b.g.visible = b.t > 0.3 || (b.t * 20 | 0) % 2 === 0; if (b.t <= 0) { this.scene.remove(b.g); bolts.splice(i, 1); } }
+    this.flash = Math.max(0, this.flash - dt * 3.2);
+    return r;
+  };
+  // o tempo do clima continua: ao trocar o clima, a tempestade acaba junto
+  const clr = G.clearWorld; G.clearWorld = function () { this.thundering = false; this.thunderF = 0; this.flash = 0; for (const b of bolts) this.scene.remove(b.g); bolts.length = 0; return clr.apply(this, arguments); };
+  // comando /weather thunder | tempestade
+  const cs = G.chatSubmit; G.chatSubmit = function (v) {
+    const m = /^\/(weather|clima)\s+(\S+)/i.exec(v || '');
+    if (m && this.cheats) { const k = m[2].toLowerCase();
+      if (['thunder', 'tempestade', 'trovoada', 'storm'].includes(k)) { if (this.dim !== 'overworld') return UI.chat(S.lang === 'en' ? 'Weather only works on the Surface' : 'O clima só funciona na Superfície', '#f66'); this.raining = true; this.thundering = true; this.weatherT = 200; nextT = 2; return UI.chat(S.lang === 'en' ? 'Weather: thunderstorm' : 'Clima: tempestade com trovões', '#aaa'); }
+      this.thundering = false; }
+    if (/^\/(raio|lightning)\b/i.test(v || '') && this.cheats) { const d = this.lookDir ? this.lookDir() : { x: 0, z: -1 }; this.strike(this.player.pos.x + d.x * 8, this.player.pos.z + d.z * 8); return; }
+    return cs.apply(this, arguments);
+  };
+})();
 
 // ===== REGRA GLOBAL DE TOQUE: nada fica "preso" selecionado/apertado, e nada de azul de navegador =====
 (function () {

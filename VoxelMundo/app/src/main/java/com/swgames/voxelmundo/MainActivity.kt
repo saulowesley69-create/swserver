@@ -14,6 +14,7 @@ import android.webkit.WebResourceResponse
 import android.webkit.WebSettings
 import android.webkit.WebView
 import android.webkit.WebViewClient
+import androidx.core.view.ViewCompat
 import androidx.core.view.WindowCompat
 import androidx.core.view.WindowInsetsCompat
 import androidx.core.view.WindowInsetsControllerCompat
@@ -82,6 +83,13 @@ class MainActivity : Activity() {
         web.webChromeClient = WebChromeClient()
         web.addJavascriptInterface(mundos, "VMFS") // os mundos viram pastas de verdade
         setContentView(web)
+        // teclado: o jogo não muda de tamanho nem de lugar; só avisa a altura do teclado para a barra do chat subir
+        ViewCompat.setOnApplyWindowInsetsListener(web) { _, ins ->
+            val ime = ins.getInsets(WindowInsetsCompat.Type.ime()).bottom
+            val d = resources.displayMetrics.density
+            web.evaluateJavascript("window.VM_NATIVE_KB=1;window.vmKb&&vmKb(" + (ime / d).toInt() + ")", null)
+            WindowInsetsCompat.CONSUMED
+        }
 
         if (saved == null || web.restoreState(saved) == null)
             web.loadUrl("https://appassets.androidplatform.net/assets/index.html")
