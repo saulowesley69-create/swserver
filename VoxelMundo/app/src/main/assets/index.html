@@ -6877,19 +6877,75 @@ MOB_CLASS.villager = function (x, y, z) { return new Villager(x, y, z, Math.floo
   // ---------- dicas ----------
   const box = document.createElement('div'); box.id = 'tipbox'; box.setAttribute('data-noi18n', ''); document.body.appendChild(box);
   const touch = () => document.body.classList.contains('touch');
+  // dicas inteligentes: o texto muda conforme o controle (teclado, joystick, setas, tocar na tela, mira + botões)
+  // e cada dica só aparece se a pessoa ainda não fez aquilo depois de um tempinho
+  const kn = c => { c = c || ''; if (c === 'Space') return en() ? 'Space' : 'Espaço'; return c.replace(/^Key/, '').replace(/^Digit/, '').replace(/Left$|Right$/, '').replace('Control', 'Ctrl'); };
+  const ctl = () => !touch() ? 'kb' : (S.touchAim === 'crosshair' ? 'cross' : 'tap');
+  const L = (pt, e) => en() ? e : pt;
+  const K = S.keys;
+  const mvTxt = () => S.touchStyle === 'joystick' ? L('o <b>joystick</b> (o círculo à esquerda)', 'the <b>joystick</b> (the circle on the left)') : L('as <b>setas</b> à esquerda', 'the <b>arrows</b> on the left');
+  const hasItem = (p, key) => { const id = IID[key] !== undefined ? IID[key] : BID[key]; return p.inv.some(s => s && s.id === id); };
+  const count = (p, f) => p.inv.reduce((a, s) => a + (s && f(s) ? s.c : 0), 0);
+  const isPlank = s => IT[s.id] && /planks/.test(IT[s.id].key);
+  const hasFood = p => p.inv.some(s => s && IT[s.id] && IT[s.id].food);
+  const F = { look: 0, jumpOk: false, stuckT: 0, lastYaw: null, lastPitch: null, tableUsed: false, ate: false };
+  { const ob = G.openBlock; G.openBlock = function (x, y, z, kind) { if (kind === 'table' || kind === 'crafting_table' || kind === 'crafting') F.tableUsed = true; return ob.apply(this, arguments); }; }
+  { const ow = G.openWindow; G.openWindow = function (kind) { if (kind === 'table' || kind === 'crafting') F.tableUsed = true; return ow.apply(this, arguments); }; }
+  // [id, quando pode aparecer, segundos de espera antes de mostrar, texto, já fez?]
   const TIPS = [
-    ['move', () => true, () => touch() ? ['Use as <b>setas</b> para andar e <b>arraste a tela</b> para olhar em volta.', 'Use the <b>arrows</b> to walk and <b>drag the screen</b> to look around.'] : ['Ande com <b>W A S D</b> e olhe em volta com o <b>mouse</b>. <b>Espaço</b> pula.', 'Walk with <b>W A S D</b> and look around with the <b>mouse</b>. <b>Space</b> jumps.'], p => p.walkDist > 12],
-    ['wood', () => true, () => touch() ? ['Chegue perto de uma árvore e <b>segure o dedo no tronco</b> para pegar madeira.', 'Go to a tree and <b>hold your finger on the trunk</b> to collect wood.'] : ['Chegue perto de uma árvore e <b>segure o botão esquerdo</b> no tronco para pegar madeira.', 'Go to a tree and <b>hold the left button</b> on the trunk to collect wood.'], p => p.adv && p.adv.wood],
-    ['inv', p => p.adv && p.adv.wood, () => touch() ? ['Abra o <b>inventário</b> (botão do baú) e coloque o tronco na grade para fazer <b>tábuas</b>.', 'Open the <b>inventory</b> (chest button) and put the log in the grid to make <b>planks</b>.'] : ['Aperte <b>E</b> para abrir o inventário. O <b>livro verde</b> mostra tudo o que dá para fazer.', 'Press <b>E</b> to open the inventory. The <b>green book</b> shows everything you can craft.'], p => p.adv && p.adv.bench],
-    ['bench', p => p.adv && p.adv.bench, () => touch() ? ['<b>Toque no chão</b> com a Bancada na mão para colocar. Nela você faz ferramentas.', '<b>Tap the ground</b> holding the Crafting Table to place it. Use it to make tools.'] : ['Coloque a Bancada com o <b>botão direito</b>. Nela você faz picareta, espada e muito mais.', 'Place the Crafting Table with the <b>right button</b>. Use it to make a pickaxe, a sword and more.'], p => p.adv && p.adv.pick],
-    ['night', p => G.world && G.world.dim === 'overworld' && G.time > 11500 && G.time < 13500, () => ['Está <b>anoitecendo</b>! Os monstros aparecem no escuro. Faça um abrigo, tochas ou uma <b>cama</b>.', '<b>Night is coming</b>! Monsters appear in the dark. Build a shelter, torches or a <b>bed</b>.'], p => G.time > 14500 || G.time < 11000],
-    ['food', p => p.food <= 8, () => ['Sua <b>fome</b> está baixa. Coma algo segurando o botão de usar com a comida na mão.', 'Your <b>hunger</b> is low. Eat by holding the use button with food in your hand.'], p => p.food > 10]
+    ['move', p => true, 5, () => ctl() === 'kb' ? L(`Ande com <b>${kn(K.fwd)} ${kn(K.left)} ${kn(K.back)} ${kn(K.right)}</b>.`, `Walk with <b>${kn(K.fwd)} ${kn(K.left)} ${kn(K.back)} ${kn(K.right)}</b>.`) : L(`Use ${mvTxt()} para andar.`, `Use ${mvTxt()} to walk.`), p => p.walkDist > 8],
+    ['look', p => true, 7, () => ctl() === 'kb' ? L('Mexa o <b>mouse</b> para olhar em volta.', 'Move the <b>mouse</b> to look around.') : L('<b>Arraste o dedo</b> na tela para olhar em volta.', '<b>Drag your finger</b> on the screen to look around.'), p => F.look > 1.2],
+    ['jump', p => F.stuckT > 1.4, 0, () => ctl() === 'kb' ? L(`Tem um bloco na frente? Aperte <b>${kn(K.jump)}</b> para pular.`, `Something in the way? Press <b>${kn(K.jump)}</b> to jump.`) : L('Tem um bloco na frente? Toque na <b>seta para cima</b> à direita para pular.', 'Something in the way? Tap the <b>up arrow</b> on the right to jump.'), p => F.jumpOk],
+    ['wood', p => true, 35, () => ({ kb: L('Chegue perto de uma árvore e <b>segure o botão esquerdo</b> do mouse no tronco para pegar madeira.', 'Go to a tree and <b>hold the left mouse button</b> on the trunk to collect wood.'),
+        tap: L('Chegue perto de uma árvore e <b>segure o dedo no tronco</b> até ele quebrar.', 'Go to a tree and <b>hold your finger on the trunk</b> until it breaks.'),
+        cross: L('Chegue perto de uma árvore, <b>mire no tronco</b> e segure o botão <b>⚔</b>.', 'Go to a tree, <b>aim at the trunk</b> and hold the <b>⚔</b> button.') })[ctl()], p => p.adv && p.adv.wood],
+    ['inv', p => p.adv && p.adv.wood, 12, () => ctl() === 'kb' ? L(`Aperte <b>${kn(K.inv)}</b> para abrir o inventário e coloque o tronco na grade para fazer <b>tábuas</b>.`, `Press <b>${kn(K.inv)}</b> to open the inventory and put the log in the grid to make <b>planks</b>.`) : L('Toque no <b>botão do baú</b> lá em cima para abrir o inventário e coloque o tronco na grade para fazer <b>tábuas</b>.', 'Tap the <b>chest button</b> at the top to open the inventory and put the log in the grid to make <b>planks</b>.'), p => count(p, isPlank) > 0 || (p.adv && p.adv.bench)],
+    ['bench', p => count(p, isPlank) >= 4 && !(p.adv && p.adv.bench), 15, () => L('Com <b>4 tábuas</b>, uma em cada quadrado da grade do inventário, você faz uma <b>Bancada</b>.', 'Put <b>4 planks</b>, one in each square of the inventory grid, to make a <b>Crafting Table</b>.'), p => p.adv && p.adv.bench],
+    ['place', p => hasItem(p, 'crafting_table'), 10, () => ({ kb: L('Escolha a Bancada na barra de baixo e use o <b>botão direito</b> no chão para colocar.', 'Pick the Crafting Table in the bottom bar and <b>right-click</b> the ground to place it.'),
+        tap: L('Escolha a Bancada na barra de baixo e dê um <b>toque rápido no chão</b> para colocar.', 'Pick the Crafting Table in the bottom bar and <b>quickly tap the ground</b> to place it.'),
+        cross: L('Escolha a Bancada na barra de baixo, <b>mire no chão</b> e toque no botão <b>✋</b>.', 'Pick the Crafting Table in the bottom bar, <b>aim at the ground</b> and tap the <b>✋</b> button.') })[ctl()], p => F.tableUsed || !hasItem(p, 'crafting_table')],
+    ['useBench', p => (p.adv && p.adv.bench) && !hasItem(p, 'crafting_table') && !F.tableUsed, 15, () => ({ kb: L('Use o <b>botão direito</b> na Bancada para abrir. Nela você faz picareta, espada e muito mais.', '<b>Right-click</b> the Crafting Table to open it. Make a pickaxe, a sword and much more.'),
+        tap: L('<b>Toque na Bancada</b> para abrir. Nela você faz picareta, espada e muito mais.', '<b>Tap the Crafting Table</b> to open it. Make a pickaxe, a sword and much more.'),
+        cross: L('Mire na Bancada e toque no <b>✋</b> para abrir. Nela você faz picareta, espada e muito mais.', 'Aim at the Crafting Table and tap <b>✋</b> to open it. Make a pickaxe, a sword and much more.') })[ctl()], p => F.tableUsed],
+    ['night', p => G.world && G.world.dim === 'overworld' && G.time > 11500 && G.time < 13500, 0, () => L('Está <b>anoitecendo</b>! Os monstros aparecem no escuro. Faça um abrigo, tochas ou uma <b>cama</b>.', '<b>Night is coming</b>! Monsters appear in the dark. Build a shelter, torches or a <b>bed</b>.'), p => G.time > 14500 || G.time < 11000],
+    ['food', p => p.food <= 8 && hasFood(p), 8, () => ({ kb: L('Sua <b>fome</b> está baixa. Escolha uma comida e <b>segure o botão direito</b>.', 'Your <b>hunger</b> is low. Pick some food and <b>hold the right button</b>.'),
+        tap: L('Sua <b>fome</b> está baixa. Escolha uma comida e <b>toque na tela</b> para comer.', 'Your <b>hunger</b> is low. Pick some food and <b>tap the screen</b> to eat.'),
+        cross: L('Sua <b>fome</b> está baixa. Escolha uma comida e <b>segure o botão ✋</b>.', 'Your <b>hunger</b> is low. Pick some food and <b>hold the ✋ button</b>.') })[ctl()], p => F.ate || p.food > 10],
+    ['nofood', p => p.food <= 6 && !hasFood(p), 20, () => L('Sua <b>fome</b> está baixa e você não tem comida. Pegue <b>maçãs</b> das folhas ou cace <b>animais</b>.', 'Your <b>hunger</b> is low and you have no food. Get <b>apples</b> from leaves or hunt <b>animals</b>.'), p => hasFood(p) || p.food > 10]
   ];
+  const ORDER = ['move', 'look', 'wood', 'inv', 'bench', 'place', 'useBench']; // passo a passo do começo
+  const wait = {}, tries = {};
   let cur = null, curT = 0;
+  const showTip = () => { box.innerHTML = '<span class="tx">' + cur[3]() + '</span><span class="tbtns"><button class="tskip">' + L('Pular', 'Skip') + '</button><button class="tall">' + L('Pular todas', 'Skip all') + '</button></span>'; };
+  box.addEventListener('pointerdown', e => e.stopPropagation());
+  box.addEventListener('click', e => { const b = e.target.closest('button'); if (!b || !cur) return; Snd.play('click');
+    if (b.classList.contains('tskip')) { S.tipsDone[cur[0]] = 1; } else { for (const t of TIPS) S.tipsDone[t[0]] = 1; }
+    saveSettings(); box.classList.remove('on'); cur = null; });
+  { const st = document.createElement('style'); st.textContent = '#tipbox.on{pointer-events:auto}body.uiopen #tipbox{pointer-events:none}#tipbox .tbtns{display:flex;gap:6px;justify-content:flex-end;margin-top:6px}#tipbox button{font:inherit;font-size:.8em;color:#fff;background:#555;border:2px solid #000;box-shadow:inset 0 -3px 0 #333,inset 0 2px 0 #888;padding:2px 10px;cursor:pointer}#tipbox button:active{background:#777}#tipbox .tall{background:#3a3a3a}'; document.head.appendChild(st); }
+  // acompanha o que a pessoa faz (a cada quadro, leve)
+  let lastEat = null;
+  let lastW = performance.now();
+  (function watch() { requestAnimationFrame(watch); const now = performance.now(), dt = Math.min(0.2, (now - lastW) / 1000); lastW = now; const p = G.player; if (!p || G.state !== 'play') return;
+    if (F.lastYaw !== null) F.look += Math.abs(p.yaw - F.lastYaw) + Math.abs(p.pitch - F.lastPitch); F.lastYaw = p.yaw; F.lastPitch = p.pitch;
+    if (G.eat && !lastEat) F.ate = true; lastEat = G.eat;
+    const inp = G.input || {}; const pushing = Math.abs(inp.f || 0) + Math.abs(inp.s || 0) > 0.3, hs = Math.hypot(p.vel.x, p.vel.z);
+    if (pushing && p.onGround && hs < 0.6 && !UI.open) F.stuckT += dt; else if (!pushing || hs > 1.5) F.stuckT = Math.max(0, F.stuckT - 2 * dt);
+    if (!p.onGround && p.vel.y > 2 && F.stuckT > 0) F.jumpOk = true; })();
   setInterval(() => { const p = G.player; if (!p || G.state !== 'play' || !G.world || p.mode !== 'survival' || S.tips === false || (G.meta && (G.meta.type === 'arena' || G.meta.type === 'kitpvp'))) { box.classList.remove('on'); cur = null; return; }
     S.tipsDone = S.tipsDone || {};
-    if (cur) { curT += 1; if (cur[3](p) || curT > 40) { S.tipsDone[cur[0]] = 1; saveSettings(); box.classList.remove('on'); cur = null; } return; }
-    for (const t of TIPS) { if (S.tipsDone[t[0]]) continue; if (!t[1](p)) { if (t[0] === 'move' || t[0] === 'wood' || t[0] === 'inv' || t[0] === 'bench') break; continue; } cur = t; curT = 0; const tx = t[2](); box.innerHTML = en() ? tx[1] : tx[0]; box.classList.add('on'); break; }
+    const done = id => { S.tipsDone[id] = 1; saveSettings(); };
+    // já fez antes da dica aparecer? então ela nunca aparece
+    for (const t of TIPS) if (!S.tipsDone[t[0]] && t !== cur && t[1](p) && t[4](p)) done(t[0]);
+    if (cur) { curT += 1;
+      if (cur[4](p)) { done(cur[0]); box.classList.remove('on'); cur = null; return; }
+      if (!cur[1](p)) { box.classList.remove('on'); wait[cur[0]] = 0; cur = null; return; }  // não faz mais sentido agora (ex.: saiu do lugar onde estava preso)
+      if (curT > 25) { tries[cur[0]] = (tries[cur[0]] || 0) + 1; if (tries[cur[0]] >= 3) done(cur[0]); wait[cur[0]] = -45; box.classList.remove('on'); cur = null; return; } // dá um tempo e tenta de novo depois
+      const tx = cur[3](), el = box.querySelector('.tx'); if (!el || el.innerHTML !== tx) showTip(); // muda na hora se trocar o controle
+      return; }
+    for (const t of TIPS) { const id = t[0]; if (S.tipsDone[id]) continue; const oi = ORDER.indexOf(id); if (oi > 0 && ORDER.slice(0, oi).some(o => !S.tipsDone[o] && o !== 'look')) continue;
+      if (!t[1](p) || t[4](p)) { if (id === 'food' || id === 'nofood' || id === 'jump') wait[id] = 0; continue; }
+      wait[id] = (wait[id] || 0) + 1; if (wait[id] < t[2]) continue;
+      cur = t; curT = 0; showTip(); box.classList.add('on'); break; }
   }, 1000);
 })();
 
