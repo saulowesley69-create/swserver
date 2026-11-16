@@ -8421,16 +8421,32 @@ body.touch #actbtn.show{display:block}`;
   document.head.appendChild(st);
   const rws = UI.renderWorlds; UI.renderWorlds = function () { rws.apply(this, arguments); const ws = G.listWorlds(); const list = document.getElementById('worldlist');
     [...list.querySelectorAll('.world')].forEach((d, i) => { const w = ws.slice().sort((a, b) => b.last - a.last)[i]; if (!w) return; const ic = document.createElement('div'); ic.className = 'wico'; if (w.icon) ic.style.backgroundImage = 'url(' + w.icon + ')'; const tx = document.createElement('div'); tx.className = 'wtx'; while (d.firstChild) tx.appendChild(d.firstChild); d.append(ic, tx); });
-    let wh = document.getElementById('wsWhere'); if (!wh) { wh = document.createElement('div'); wh.id = 'wsWhere'; list.after(wh); } wh.textContent = (FS ? '📁 ' : '') + L('Mundos salvos em: ', 'Worlds saved in: ') + WS.where();
-    addButtons(); };
-  function addButtons() { if (!FS || document.getElementById('wExport')) return; const row = document.querySelector('#s-worlds .brow:last-of-type') || document.getElementById('wPlay').parentNode;
-    const mk = (id, pt, e2, fn) => { const b = document.createElement('button'); b.className = 'btn'; b.id = id; b.textContent = L(pt, e2); b.onclick = () => { Snd.play('click'); fn(); }; return b; };
-    const r2 = document.createElement('div'); r2.className = 'brow';
-    r2.append(mk('wExport', 'Exportar', 'Export', async () => { if (!UI.selWorld) return UI.toast(L('Selecione um mundo', 'Select a world')); await WS.flush(); const r = await WS.exportZip(UI.selWorld); if (!r) return UI.toast(L('Não deu para exportar', 'Could not export'));
-        if (window.VMFS && VMFS.saveDownload) { const fr = new FileReader(); fr.onload = () => { const ok = VMFS.saveDownload(r.name, String(fr.result).split(',')[1]); UI.toast(ok ? L('Salvo em Downloads: ', 'Saved to Downloads: ') + r.name : L('Não deu para salvar', 'Could not save')); }; fr.readAsDataURL(r.blob); return; }
-        const a = document.createElement('a'); a.href = URL.createObjectURL(r.blob); a.download = r.name; document.body.appendChild(a); a.click(); setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 2000); }),
-      mk('wImport', 'Importar', 'Import', () => { const inp = document.createElement('input'); inp.type = 'file'; inp.accept = '.zip,application/zip'; inp.onchange = async () => { const f = inp.files[0]; if (!f) return; try { const m = await WS.importZip(f); UI.selWorld = m.id; UI.renderWorlds(); UI.toast(L('Mundo importado: ', 'World imported: ') + m.name); } catch (e) { console.error(e); UI.toast(L('Esse arquivo não é um mundo do VoxelMundo', 'This file is not a VoxelMundo world')); } }; inp.click(); }));
-    row.after(r2); }
+    let wh = document.getElementById('wsWhere'); if (!wh) { wh = document.createElement('div'); wh.id = 'wsWhere'; wh.dataset.noi18n = '1'; list.after(wh); } wh.textContent = L('Mundos salvos em: ', 'Worlds saved in: ') + WS.where();
+    addFolderButton(); };
+  // ícone de pasta em pixel art (desenho próprio)
+  const FOLDER = () => fromRows(['................', '................', '..KKKKK.........', '.KYYYYYK........', '.KYYYYYKKKKKKKK.', '.KYyyyyyyyyyyyK.', '.KYYYYYYYYYYYYK.', '.KYYYYYYYYYYYYK.', '.KYYYYYYYYYYYYK.', '.KYYYYYYYYYYYYK.', '.KYYYYYYYYYYYYK.', '.KyyyyyyyyyyyyK.', '.KKKKKKKKKKKKKK.', '................', '................', '................'], { K: [40, 28, 12], Y: [236, 188, 64], y: [196, 146, 40] }).toDataURL();
+  function addFolderButton() { if (!FS || document.getElementById('wsMgrBtn')) return; const b = document.createElement('button'); b.id = 'wsMgrBtn'; b.title = L('Gerenciar mundos', 'Manage worlds');
+    b.style.cssText = `position:absolute;top:14px;right:16px;width:58px;height:58px;padding:0!important;min-height:0;background:#727272 url(${FOLDER()}) center/40px 40px no-repeat;image-rendering:pixelated;border:2px solid #000;box-shadow:inset 2px 2px 0 #a8a8a8,inset -2px -3px 0 #4a4a4a;cursor:pointer;z-index:5`;
+    b.onclick = () => { Snd.play('click'); openManager(); }; document.getElementById('s-worlds').appendChild(b); }
+  // painel de gerenciar mundos: local, backup, importar, renomear, duplicar
+  function openManager() { let p = document.getElementById('wsMgr'); if (!p) { p = document.createElement('div'); p.id = 'wsMgr'; p.className = 'dirt'; p.style.cssText = 'position:fixed;inset:0;z-index:95;background:#2a1d14 var(--dirtbg);background-size:64px;image-rendering:pixelated;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:8px;padding:14px;overflow:auto'; document.body.appendChild(p); }
+    p.innerHTML = ''; p.style.display = 'flex'; const sel = WS.cache.find(m => m.id === UI.selWorld);
+    const h = document.createElement('h2'); h.textContent = L('Gerenciar mundos', 'Manage worlds'); const info = document.createElement('div'); info.style.cssText = 'color:#ddd;font-size:19px;text-align:center'; info.textContent = L('Salvos em: ', 'Saved in: ') + WS.where() + (sel ? ' · ' + L('Selecionado: ', 'Selected: ') + sel.name : '');
+    p.append(h, info);
+    const b = (txt, fn, red) => { const x = document.createElement('button'); x.className = 'btn' + (red ? ' red' : ''); x.textContent = txt; x.style.width = 'min(420px,86vw)'; x.onclick = () => { Snd.play('click'); fn(); }; p.appendChild(x); return x; };
+    const need = () => { if (!sel) { UI.toast(L('Selecione um mundo na lista primeiro', 'Select a world in the list first')); return false; } return true; };
+    b(L('Fazer backup do mundo (exportar .zip)', 'Back up world (export .zip)'), async () => { if (!need()) return; await WS.flush(); const r = await WS.exportZip(sel.id); if (!r) return UI.toast(L('Não deu para exportar', 'Could not export'));
+      if (window.VMFS && VMFS.saveDownload) { const fr = new FileReader(); fr.onload = () => { const ok = VMFS.saveDownload(r.name, String(fr.result).split(',')[1]); UI.toast(ok ? L('Salvo em Downloads/VoxelMundo: ', 'Saved to Downloads/VoxelMundo: ') + r.name : L('Não deu para salvar', 'Could not save')); }; fr.readAsDataURL(r.blob); return; }
+      const a = document.createElement('a'); a.href = URL.createObjectURL(r.blob); a.download = r.name; document.body.appendChild(a); a.click(); setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 2000); });
+    b(L('Importar mundo (.zip)', 'Import world (.zip)'), () => { const inp = document.createElement('input'); inp.type = 'file'; inp.accept = '.zip,application/zip'; inp.onchange = async () => { const f = inp.files[0]; if (!f) return; try { const m = await WS.importZip(f); UI.selWorld = m.id; UI.renderWorlds(); UI.toast(L('Mundo importado: ', 'World imported: ') + m.name); openManager(); } catch (e) { console.error(e); UI.toast(L('Esse arquivo não é um mundo do VoxelMundo', 'This file is not a VoxelMundo world')); } }; inp.click(); });
+    b(L('Renomear', 'Rename'), () => { if (!need()) return; const row = document.createElement('div'); row.style.cssText = 'display:flex;gap:6px;width:min(420px,86vw)'; const inp = document.createElement('input'); inp.value = sel.name; inp.maxLength = 30; inp.style.cssText = 'flex:1;font:inherit;font-size:20px;background:#000;color:#fff;border:2px solid #a0a0a0;padding:4px 8px';
+      const ok = document.createElement('button'); ok.className = 'btn'; ok.textContent = 'OK'; ok.style.width = '90px'; ok.onclick = async () => { const n = inp.value.trim(); if (!n) return; sel.name = n; const mj = await FS.read(base(sel) + 'mundo.json'); try { const w = JSON.parse(mj); w.meta = metaOnly(sel); await FS.write(base(sel) + 'mundo.json', JSON.stringify(w, null, 1)); } catch (e) { } UI.renderWorlds(); openManager(); UI.toast(L('Nome trocado', 'Renamed')); };
+      row.append(inp, ok); p.insertBefore(row, p.lastChild); inp.focus(); });
+    b(L('Duplicar', 'Duplicate'), async () => { if (!need()) return; await WS.flush(); const r = await WS.exportZip(sel.id); if (!r) return; const m = await WS.importZip(new File([r.blob], r.name)); m.name = sel.name + L(' (cópia)', ' (copy)'); const mj = await FS.read(base(m) + 'mundo.json'); try { const w = JSON.parse(mj); w.meta = metaOnly(m); await FS.write(base(m) + 'mundo.json', JSON.stringify(w, null, 1)); } catch (e) { } UI.renderWorlds(); UI.toast(L('Cópia criada', 'Copy created')); openManager(); });
+    if (window.VMFS && window.openWorldLocation) b(L('Mudar o local dos mundos...', 'Change world location...'), () => { p.style.display = 'none'; openWorldLocation(); });
+    b(L('Voltar', 'Back'), () => { p.style.display = 'none'; });
+    if (window.fitButtons) requestAnimationFrame(fitButtons); }
+  WS.openManager = openManager;
   // salva antes de fechar/trocar de app
   document.addEventListener('visibilitychange', () => { if (document.hidden && G.state === 'play') try { G.saveWorld(); } catch (e) { } });
   WS.init();
@@ -8440,19 +8456,26 @@ body.touch #actbtn.show{display:block}`;
   if (!window.VMFS) return; const L = (pt, e) => S.lang === 'en' ? e : pt;
   const panel = () => { let p = document.getElementById('wsLoc'); if (p) return p; p = document.createElement('div'); p.id = 'wsLoc'; p.className = 'screen';
     p.style.cssText = 'position:fixed;inset:0;z-index:95;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:8px;background:rgba(0,0,0,.82)'; document.body.appendChild(p); return p; };
-  const open = () => { const p = panel(); p.innerHTML = ''; p.style.display = 'flex';
-    const t = document.createElement('h2'); t.textContent = L('Local dos mundos', 'World save location'); const now = document.createElement('div'); now.style.cssText = 'color:#ddd;font-size:19px;margin-bottom:6px'; now.textContent = L('Agora: ', 'Now: ') + VMFS.where();
+  const open = (first) => { const p = panel(); p.innerHTML = ''; p.style.display = 'flex'; p.className = 'screen dirt'; first = first === true;
+    const t = document.createElement('h2'); t.textContent = first ? L('Onde guardar seus mundos?', 'Where to keep your worlds?') : L('Local dos mundos', 'World save location'); const now = document.createElement('div'); now.style.cssText = 'color:#ddd;font-size:19px;margin-bottom:6px'; now.textContent = L('Agora: ', 'Now: ') + VMFS.where();
     const b = (txt, fn) => { const x = document.createElement('button'); x.className = 'btn'; x.textContent = txt; x.onclick = () => { Snd.play('click'); fn(); }; p.appendChild(x); };
     p.append(t, now);
-    const done = ok => { p.style.display = 'none'; if (ok) { UI.toast(L('Mundos agora em: ', 'Worlds now in: ') + VMFS.where()); WorldStore.init(); } else UI.toast(L('Não deu para usar essa pasta', 'Could not use that folder')); };
+    if (first) { const ex = document.createElement('div'); ex.style.cssText = 'color:#eee;font-size:19px;max-width:560px;text-align:center;margin-bottom:6px'; ex.textContent = L('Cada mundo vira uma pasta no seu celular. Assim você pode copiar, fazer backup e levar para outro aparelho.', 'Each world becomes a folder on your phone, so you can copy it, back it up and move it to another device.'); p.appendChild(ex); }
+    const done = ok => { try { localStorage.setItem('vm_loc_ok', '1'); } catch (e) { } p.style.display = 'none'; if (ok) { UI.toast(L('Mundos agora em: ', 'Worlds now in: ') + VMFS.where()); WorldStore.init(); } else UI.toast(L('Não deu para usar essa pasta', 'Could not use that folder')); };
     b(L('Documentos/VoxelMundo (padrão)', 'Documents/VoxelMundo (default)'), () => done(VMFS.useDocuments()));
     b(L('Escolher outra pasta...', 'Choose another folder...'), () => { window.onVMFSFolder = r => { if (r === 'cancelado') return; done(r === 'ok'); }; VMFS.pickFolder(); });
     b(L('Pasta privada do app', 'Private app folder'), () => done(VMFS.useAppFolder()));
     const n = document.createElement('div'); n.style.cssText = 'color:#aaa;font-size:16px;max-width:560px;text-align:center'; n.textContent = L('Os mundos que já existem são copiados para o novo lugar.', 'Existing worlds are copied to the new place.'); p.appendChild(n);
-    b(L('Voltar', 'Back'), () => { p.style.display = 'none'; }); };
+    if (!first) b(L('Voltar', 'Back'), () => { p.style.display = 'none'; }); if (window.fitButtons) requestAnimationFrame(fitButtons); };
   const bo = UI.buildOptions; UI.buildOptions = function () { const r = bo.apply(this, arguments); if ((this.optPage || 'main') === 'main') { const box = document.getElementById('optlist'); const x = document.createElement('button'); x.className = 'btn'; x.textContent = L('Local dos mundos...', 'World save location...'); x.onclick = () => { Snd.play('click'); open(); }; box.appendChild(x); } return r; };
   window.openWorldLocation = open;
+  // primeira vez: pergunta com uma tela do próprio jogo (sem cara de Android)
+  let asked = false; try { asked = !!localStorage.getItem('vm_loc_ok'); } catch (e) { }
+  if (!asked) { const t = setInterval(() => { if (G.state === 'title' && !G.booting && WorldStore.ready) { clearInterval(t); open(true); } }, 500); }
 })();
+
+;(function(){ if (!window.I18N) return; const ap = I18N.apply; I18N.apply = function(){ const r = ap.apply(this, arguments); try { const wh = document.getElementById('wsWhere'); if (wh && window.WorldStore) wh.textContent = (S.lang==='en'?'Worlds saved in: ':'Mundos salvos em: ') + WorldStore.where(); } catch(e){} return r; }; })();
+;(function(){ const sh = UI.show.bind(UI); UI.show = function(id){ const r = sh.apply(null, arguments); if (id === 's-worlds') try { const wh = document.getElementById('wsWhere'); if (wh) wh.textContent = (S.lang==='en'?'Worlds saved in: ':'Mundos salvos em: ') + WorldStore.where(); } catch(e){} return r; }; })();
 
 // ===== REGRA GLOBAL DE TOQUE: nada fica "preso" selecionado/apertado, e nada de azul de navegador =====
 (function () {
@@ -8482,4 +8505,32 @@ input:focus-visible{box-shadow:0 0 0 2px #8f8}`;
   // trocar de app/aba ou perder o foco solta tudo que estava apertado
   const releaseAll = () => { for (const el of held.values()) el.classList.remove('prs'); held.clear(); document.querySelectorAll('#touchui .on').forEach(el => { if (el.id !== 'bSneak' || !G.touchSneak) el.classList.remove('on'); }); };
   window.addEventListener('blur', releaseAll); document.addEventListener('visibilitychange', () => { if (document.hidden) releaseAll(); });
+})();
+
+// ===== REGRAS GLOBAIS DE INTERFACE: cara de jogo, não de site =====
+(function () {
+  const L = (pt, e) => S.lang === 'en' ? e : pt;
+  const st = document.createElement('style'); st.textContent = `
+/* nada de "esticar" a tela ao puxar (efeito de site/celular) */
+html,body,*{overscroll-behavior:none}
+/* botões: nunca cortam o texto e nunca ficam sem texto (aquele "buraco" de uma linha só) */
+.btn{white-space:normal!important;height:auto!important;min-height:40px;line-height:1.05!important;padding:5px 8px!important;text-overflow:clip!important;overflow:hidden;word-break:normal;overflow-wrap:anywhere}
+.btn:empty{display:none!important}
+#bAbout{display:none!important}
+.vmcred{font-size:16px;color:#cfcfcf;line-height:1.25;margin-top:10px}`;
+  document.head.appendChild(st);
+  // texto grande demais para o botão: diminui a letra até caber (no máximo até 13px)
+  const fit = () => { for (const b of document.querySelectorAll('.btn')) { if (!b.offsetParent) continue; b.style.fontSize = ''; let fs = parseFloat(getComputedStyle(b).fontSize), n = 0;
+      while ((b.scrollWidth > b.clientWidth + 1 || b.scrollHeight > b.clientHeight + 2 && b.clientHeight > 52) && fs > 13 && n++ < 12) { fs -= 1; b.style.fontSize = fs + 'px'; } } };
+  window.fitButtons = fit;
+  const sh = UI.show; UI.show = function () { const r = sh.apply(this, arguments); requestAnimationFrame(fit); return r; };
+  const bo = UI.buildOptions; UI.buildOptions = function () { const r = bo.apply(this, arguments);
+    if (this.optPage === 'credits') { const c = document.createElement('div'); c.className = 'vmcred';
+      c.textContent = L('Sons de licença livre: Minetest Game (github.com/luanti-org/minetest_game) e VoxeLibre (github.com/VoxeLibre/VoxeLibre), por celeron55, Mito551, TenPlus1, Zozzy, evsecrets, Under7dude, haratman, kantouth, Baŝto, columbia23, Darsycho, NPXcoot, Blender Foundation, sofar, AGFX, TumeniNodes, steveygos93, theneedle.tv, Benboncan, junggle e outros — licenças CC BY-SA 3.0/4.0, CC BY 3.0, MIT e CC0. Músicas e texturas: feitas para o VoxelMundo.',
+        'Open-licensed sounds: Minetest Game (github.com/luanti-org/minetest_game) and VoxeLibre (github.com/VoxeLibre/VoxeLibre), by celeron55, Mito551, TenPlus1, Zozzy, evsecrets, Under7dude, haratman, kantouth, Baŝto, columbia23, Darsycho, NPXcoot, Blender Foundation, sofar, AGFX, TumeniNodes, steveygos93, theneedle.tv, Benboncan, junggle and others — CC BY-SA 3.0/4.0, CC BY 3.0, MIT and CC0 licenses. Music and textures: made for VoxelMundo.');
+      c.setAttribute('data-noi18n', ''); document.getElementById('optlist').appendChild(c); }
+    requestAnimationFrame(fit); return r; };
+  addEventListener('resize', () => requestAnimationFrame(fit));
+  // lista de servidores sem emoji de cadeado
+  new MutationObserver(ms => { for (const m of ms) for (const n of m.addedNodes) if (n.nodeType === 1 && n.classList && n.classList.contains('lob') && /🔒/.test(n.textContent)) n.textContent = n.textContent.replace(/🔒\s*/, '[' + L('senha', 'password') + '] '); }).observe(document.body, { childList: true, subtree: true });
 })();

@@ -59,6 +59,8 @@ class MainActivity : Activity() {
 
         web = WebView(this)
         web.setBackgroundColor(Color.BLACK)
+        web.overScrollMode = android.view.View.OVER_SCROLL_NEVER // sem "esticar" a tela ao puxar
+        web.isVerticalScrollBarEnabled = false; web.isHorizontalScrollBarEnabled = false
         web.settings.apply {
             javaScriptEnabled = true
             domStorageEnabled = true
