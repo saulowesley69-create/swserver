@@ -193,7 +193,7 @@ h2{text-shadow:3px 3px 0 #2a2a2a;font-size:36px}
 #loadtip{margin-top:14px;color:#bbb;font-size:20px;max-width:min(460px,84vw);text-align:center;min-height:44px;text-shadow:2px 2px #000}
 #s-loading{image-rendering:pixelated}
 #boot{position:absolute;inset:0;z-index:90;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:14px;background-color:#2a1d14;background-image:var(--dirtbg);background-size:64px 64px;image-rendering:pixelated;box-shadow:inset 0 0 160px rgba(0,0,0,.7);transition:opacity .45s}
-#boot.out{opacity:0;pointer-events:none}
+#boot.out{opacity:0;pointer-events:none}#boot.out *{pointer-events:none!important}#boot.out #bootcube,#boot.hidden #bootcube{animation:none}
 #boot .logo{margin:0}
 #bootbar{width:min(360px,70vw);height:12px;background:#222;border:2px solid #000;box-shadow:0 0 0 2px #555}#bootbar div{height:100%;width:0;background:#6c6;transition:width .15s}
 #boottxt{font-size:20px;color:#bbb;text-shadow:2px 2px 0 #222}
@@ -5371,7 +5371,7 @@ const G = {
       if (nb.shape === 'panel') { if (t.n[1] !== 0 || BL[t.id].replace) { if (it.block === BID.vine && t.n[1] === -1 && BL[t.id].key.includes('leaves')) { } else return; } else if (!SOLID[t.id] || BL[t.id].shape) return; }
       if (nb.cross) { const below = w.getBlock(x, y - 1, z); const nearW = [[1, 0], [-1, 0], [0, 1], [0, -1]].some(([dx, dz]) => LIQT[w.getBlock(x + dx, y - 1, z + dz)] === 1); const ok = it.block === BID.sugarcane ? (below === BID.sugarcane || ([BID.grass, BID.dirt, BID.sand, BID.red_sand].includes(below) && nearW)) : [BID.grass, BID.dirt, BID.farmland, BID.snow_grass].includes(below) || ((it.block === BID.deadbush) && below === BID.sand) || ((it.block === BID.brown_mushroom || it.block === BID.red_mushroom) && SOLID[below]); if (!ok) return; }
       if (nb.torch && !SOLID[w.getBlock(x, y - 1, z)] && !SOLID[w.getBlock(t.x, t.y, t.z)]) return;
-      if (nb.solid) { const bb = { min: { x, y, z }, max: { x: x + 1, y: y + 1, z: z + 1 } }; const ov = e => { const a = e.aabb(); return a.min.x < bb.max.x && a.max.x > bb.min.x && a.min.y < bb.max.y && a.max.y > bb.min.y && a.min.z < bb.max.z && a.max.z > bb.min.z; }; if (p.mode !== 'spectator' && ov(p)) return; for (const e of this.entities) if (e instanceof Mob && !e.dying && ov(e)) return; }
+      if (nb.solid) { const bb = { min: { x, y, z }, max: { x: x + 1, y: y + 1, z: z + 1 } }; const ov = e => { const a = e.aabb(); return a.min.x < bb.max.x && a.max.x > bb.min.x && a.min.y < bb.max.y && a.max.y > bb.min.y && a.min.z < bb.max.z && a.max.z > bb.min.z; }; if (p.mode !== 'spectator' && ov(p)) return; for (const e of this.entities) if (e instanceof Mob && !e.dying && ov(e)) return; if (window.NET && NET.bodyIn && NET.bodyIn(x, y, z)) return; }
       if (nb.shape === 'door' && (y + 1 >= WH || w.getBlock(x, y + 1, z))) return;
       let bedDir = null;
       if (nb.shape === 'bed') { const fx = -Math.sin(p.yaw), fz = -Math.cos(p.yaw); bedDir = Math.abs(fx) > Math.abs(fz) ? (fx > 0 ? 0 : 1) : (fz > 0 ? 2 : 3); const D = BED_DIRS[bedDir], hc = w.getBlock(x + D[0], y, z + D[1]); if (hc && !BL[hc].replace) { UI.toast('A cama precisa de 2 blocos livres.'); return; } }
@@ -5593,7 +5593,7 @@ const G = {
     joy.addEventListener('pointermove', e => { if (e.pointerId === jid) jmove(e.clientX, e.clientY); });
     const jend = e => { if (e.pointerId !== jid) return; jid = null; this.joy.f = this.joy.s = 0; knob.style.transform = ''; };
     joy.addEventListener('pointerup', jend); joy.addEventListener('pointercancel', jend);
-    const btn = (id, down, up) => { const el = $(id); el.addEventListener('pointerdown', e => { e.preventDefault(); e.stopPropagation(); Snd.init(); el.classList.add('on'); el.setPointerCapture(e.pointerId); down && down(); }); const u = e => { el.classList.remove('on'); up && up(); }; el.addEventListener('pointerup', u); el.addEventListener('pointercancel', u); };
+    const btn = (id, down, up) => { const el = $(id); el.addEventListener('pointerdown', e => { e.preventDefault(); e.stopPropagation(); Snd.init(); el.classList.add('on'); el.setPointerCapture(e.pointerId); down && down(); }); const u = e => { el.classList.remove('on'); up && up(); }; el.addEventListener('pointerup', u); el.addEventListener('pointercancel', u); el.addEventListener('lostpointercapture', u); };
     btn('#bJump', () => { const now = performance.now(); if (now - (this.lastTJ || 0) < 300 && this.player.mode === 'creative') { this.player.flying = !this.player.flying; this.player.vel.y = 0; } this.lastTJ = now; this.tJump = true; }, () => this.tJump = false);
     btn('#bSneak', () => { this.touchSneak = !this.touchSneak; $('#bSneak').classList.toggle('lock', this.touchSneak); });
     btn('#bRun', () => { this.touchRun = !this.touchRun; $('#bRun').classList.toggle('lock', this.touchRun); });
@@ -7575,8 +7575,49 @@ MOB_CLASS.villager = function (x, y, z) { return new Villager(x, y, z, Math.floo
     showMsg(dn === 'senha' ? tr('Este mundo tem <b>senha</b>. Peça a senha ao dono e digite no campo "Senha".', 'This world has a <b>password</b>. Ask the owner and type it in the "Password" field.') : dn === 'ban' ? tr('Você foi <b>banido</b> deste mundo.', 'You were <b>banned</b> from this world.') : dn === 'kick' ? tr('Você foi <b>expulso</b> do mundo pelo dono.', 'You were <b>kicked</b> by the world owner.') : dn === 'cheio' ? tr('O mundo está <b>cheio</b>. Tente mais tarde.', 'The world is <b>full</b>. Try later.') : tr('A conexão com o anfitrião foi perdida.', 'Lost connection to the host.'));
   }
   function saveGuest(peer, sv) { if (!sv || !peer.name) return; (G.endState.guests || (G.endState.guests = {}))[peer.name] = sv; }
+  // ===== REGRAS GLOBAIS DO MULTIJOGADOR: o anfitrião confere tudo o que o convidado manda =====
+  const NR = { reach: 10, hitReach: 6, maxBlocks: 40, prot: 5000, hitGap: 150, pvpGap: 250, maxDmg: 20 };
+  const V3 = (x, y, z) => new THREE.Vector3(x, y, z);
+  function guestDead(peer) { const st = peer.st || {}; return !!st.dd || (peer.proxy && peer.proxy.dead && !st.p); }
+  function guestSpec(peer) { return (peer.st || {}).mo === 'spectator'; }
+  function nearGuest(peer, x, y, z, r) { const px = peer.proxy, st = peer.st; const pos = st && st.p ? V3(st.p[0], st.p[1] + 1, st.p[2]) : px ? px.pos : null; return !!pos && pos.distanceTo(V3(x, y, z)) <= r; }
+  function protectedPeer(peer) { return !!peer && performance.now() < (peer.protUntil || 0); }
+  // alguém (anfitrião ou outro convidado) ocupa esse bloco?
+  function bodyIn(x, y, z, except) { const hit = (px, py, pz) => px + 0.3 > x && px - 0.3 < x + 1 && py + 1.8 > y && py < y + 1 && pz + 0.3 > z && pz - 0.3 < z + 1;
+    const me = G.player; if (me && !me.dead && me.mode !== 'spectator' && hit(me.pos.x, me.pos.y, me.pos.z)) return true;
+    for (const q of NET.peers) { if (q === except || !q.open || !q.st || !q.st.p || q.st.dd || q.st.mo === 'spectator' || q.st.d !== G.dim) continue; if (hit(q.st.p[0], q.st.p[1], q.st.p[2])) return true; } return false; }
+  // manda de volta o bloco verdadeiro (o mundo do convidado volta a ficar igual ao do anfitrião)
+  function resync(peer, list) { const out = []; for (const e of list) { const [d, x, y, z] = e; const w = worldOf(d); if (!w || !w.chunks.get(ckey(x >> 4, z >> 4))) continue; out.push([d, x, y, z, w.getBlock(x, y, z)]); } if (out.length) send(peer, { t: 'b', l: out }); }
+  function netRuleOk(peer, o) {
+    const now = performance.now(), dead = guestDead(peer), spec = guestSpec(peer);
+    switch (o.t) {
+      case 'b': { const l = Array.isArray(o.l) ? o.l : []; if (dead || spec) { resync(peer, l); return false; }
+        const R = peer.bRate || (peer.bRate = { t: now, n: 0 }); if (now - R.t > 1000) { R.t = now; R.n = 0; }
+        const ok = [], bad = [];
+        for (const e of l) { const [d, x, y, z, id] = e; R.n++;
+          if (R.n > NR.maxBlocks) { bad.push(e); continue; }                                   // muitos de uma vez (spam)
+          if (peer.st && peer.st.d && d !== peer.st.d) { bad.push(e); continue; }              // outra dimensão
+          if (!nearGuest(peer, x + 0.5, y + 0.5, z + 0.5, NR.reach + 2)) { bad.push(e); continue; } // longe demais
+          if (id && SOLID[id] && BL[id] && !BL[id].replace && bodyIn(x, y, z, peer)) { bad.push(e); continue; } // dentro de alguém
+          ok.push(e); }
+        if (bad.length) resync(peer, bad); o.l = ok; return ok.length > 0; }
+      case 'brk': return !dead && !spec && Array.isArray(o.b) && nearGuest(peer, o.b[0] + 0.5, o.b[1] + 0.5, o.b[2] + 0.5, NR.reach + 2);
+      case 'hit': case 'use': { if (dead || spec) return false; const e = G.entities.find(e => e.nid === o.i); if (e && !nearGuest(peer, e.pos.x, e.pos.y + 0.8, e.pos.z, NR.hitReach + 2)) return false;
+        if (o.t === 'hit') { if (now - (peer.lastHit || 0) < NR.hitGap) return false; peer.lastHit = now; o.n = Math.min(+o.n || 0, NR.maxDmg); } return true; }
+      case 'pvp': { if (dead || spec) return false; if (now - (peer.lastPvp || 0) < NR.pvpGap) return false;
+        let tp = null, pos = null;
+        if (o.to === 0) { const me = G.player; if (!me || me.dead || me.mode === 'creative' || me.mode === 'spectator' || now < (NET.hostProtUntil || 0)) return false; pos = me.pos; }
+        else { tp = NET.peers.find(x => x.id === o.to && x.open); if (!tp || !tp.st || !tp.st.p || tp.st.dd || tp.st.mo === 'creative' || tp.st.mo === 'spectator' || protectedPeer(tp)) return false; pos = V3(tp.st.p[0], tp.st.p[1], tp.st.p[2]); }
+        if (!nearGuest(peer, pos.x, pos.y + 1, pos.z, NR.hitReach + 1.5)) return false;
+        peer.lastPvp = now; o.d = Math.max(0, Math.min(+o.d || 0, NR.maxDmg)); return true; }
+      case 'tnt': case 'ccart': case 'summon': return !dead && !spec && Array.isArray(o.p) && nearGuest(peer, o.p[0], o.p[1], o.p[2], NR.reach + 2);
+      case 'pick': return !dead && !spec;
+    }
+    return true;
+  }
   function onHostMsg(peer, o) {
     const w = G.world;
+    if (!netRuleOk(peer, o)) return;
     switch (o.t) {
       case 'bye': { if (peer.open) { peer.open = false; onClose(peer); try { peer.pc.close(); } catch (e) { } } break; }
       case 'hi': { peer.cid = String(o.cid || '').slice(0, 20); const C = cfg();
@@ -7585,7 +7626,7 @@ MOB_CLASS.villager = function (x, y, z) { return new Villager(x, y, z, Math.floo
         if (NET.peers.filter(p => p.open && p.name && p !== peer).length >= C.max) { deny(peer, 'cheio'); break; }
         if (C.pw && String(o.pw || '') !== C.pw) { deny(peer, 'senha'); break; }
         let name = String(o.name || 'Jogador').slice(0, 16); if (isBad(name) || /[*]/.test(cleanText(name))) name = tr('Jogador', 'Player'); { const taken = n => n === pname() || NET.peers.some(p => p !== peer && p.open && p.name === n); if (taken(name)) { let i = 2; while (taken(name + ' ' + i)) i++; name = name + ' ' + i; } } peer.name = name; peer.skin = o.skin || {}; send(peer, snapshotFor(peer, name)); UI.chat(name + tr(' entrou no jogo', ' joined the game'), '#ff5'); advertise(); toAll({ t: 'chat', m: name + tr(' entrou no jogo', ' joined the game'), c: '#ff5' }, peer); updatePauseInfo(); break; }
-      case 'me': { peer.st = o; const px = proxyOf(peer); if (o.dd && !px.dead && G.world && G.world.wtype === 'kitpvp' && window.kitClearBotsFor) { px.pos.set(o.p[0], o.p[1], o.p[2]); px.dead = true; kitClearBotsFor(px); } px.pos.set(o.p[0], o.p[1], o.p[2]); px.yaw = o.y; px.mode = o.mo; px.dead = !!o.dd; px.dim = o.d; px.sneaking = !!o.sn; if (o.save) saveGuest(peer, o.save); break; }
+      case 'me': { const wasDead = peer.st && peer.st.dd; if (!peer.st || (wasDead && !o.dd) || (o.rs || 0) !== (peer.st.rs || 0)) peer.protUntil = performance.now() + NR.prot; peer.st = o; const px = proxyOf(peer); if (o.dd && !px.dead && G.world && G.world.wtype === 'kitpvp' && window.kitClearBotsFor) { px.pos.set(o.p[0], o.p[1], o.p[2]); px.dead = true; kitClearBotsFor(px); } px.pos.set(o.p[0], o.p[1], o.p[2]); px.yaw = o.y; px.mode = o.mo; px.dead = !!o.dd; px.dim = o.d; px.sneaking = !!o.sn; if (o.save) saveGuest(peer, o.save); break; }
       case 'b': applyBlocks(o.l, peer); break; // o próprio anfitrião repassa a todos (com o que mais mudar: tocha que cai, água que corre...)
       case 'bd': { applyBdata(o.l); toAll({ t: 'bd', l: o.l }, peer); break; }
       case 'brk': { // o convidado quebrou um bloco: o anfitrião gera os itens
@@ -7794,6 +7835,12 @@ MOB_CLASS.villager = function (x, y, z) { return new Villager(x, y, z, Math.floo
   }
   function nameTag(name) { const c = document.createElement('canvas'), g = c.getContext('2d'); g.font = '40px VT323, monospace'; const w = Math.ceil(g.measureText(name).width) + 24; c.width = w; c.height = 52; g.fillStyle = 'rgba(0,0,0,0.4)'; g.fillRect(0, 0, w, 52); g.font = '40px VT323, monospace'; g.textBaseline = 'middle'; g.fillStyle = '#fff'; g.fillText(name, 12, 27);
     const t = new THREE.CanvasTexture(c); t.minFilter = THREE.LinearFilter; const s = new THREE.Sprite(new THREE.SpriteMaterial({ map: t, depthTest: false, transparent: true })); s.renderOrder = 6; s.scale.set(0.5 * w / 52 * 0.9, 0.45, 1); s.position.set(0, 2.35, 0); return s; }
+  // balãozinho "…" em cima de quem está no menu/chat (desenho próprio, sem texto)
+  let bubbleTex = null;
+  function menuBubble() { if (!bubbleTex) { const c = document.createElement('canvas'); c.width = 32; c.height = 24; const g = c.getContext('2d'); const px = (x, y, w, h, col) => { g.fillStyle = col; g.fillRect(x, y, w, h); };
+      px(3, 1, 26, 16, '#222'); px(2, 2, 28, 14, '#222'); px(4, 2, 24, 14, '#fff'); px(3, 3, 26, 12, '#fff'); px(10, 17, 6, 2, '#222'); px(10, 17, 4, 4, '#222'); px(11, 16, 4, 2, '#fff'); px(11, 17, 2, 2, '#fff');
+      for (const x of [8, 14, 20]) px(x, 8, 4, 4, '#444'); bubbleTex = new THREE.CanvasTexture(c); bubbleTex.magFilter = THREE.NearestFilter; bubbleTex.minFilter = THREE.NearestFilter; }
+    const s = new THREE.Sprite(new THREE.SpriteMaterial({ map: bubbleTex, depthTest: false, transparent: true })); s.renderOrder = 7; s.scale.set(0.5, 0.375, 1); s.position.set(0, 2.82, 0); s.visible = false; return s; }
   function dropAvatar(id) { const a = NET.avatars.get(id); if (a) { G.scene.remove(a.grp); if (a.crack) G.scene.remove(a.crack); NET.avatars.delete(id); } }
   function clearAvatars() { for (const id of [...NET.avatars.keys()]) dropAvatar(id); }
   function setAvatar(id, st, dt) {
@@ -7801,6 +7848,7 @@ MOB_CLASS.villager = function (x, y, z) { return new Villager(x, y, z, Math.floo
     if (a && a.key !== key) { const pos = a.grp.position.clone(), ry = a.grp.rotation.y, ck = a.crack; G.scene.remove(a.grp); a = null; NET.avatars.delete(id); const n = makeAvatar(st); n.crack = ck; n.grp.position.copy(pos); n.grp.rotation.y = ry; G.scene.add(n.grp); NET.avatars.set(id, n); a = n; }
     if (!a) { a = makeAvatar(st); a.grp.position.set(st.p[0], st.p[1], st.p[2]); G.scene.add(a.grp); NET.avatars.set(id, a); }
     a.st = st; a.grp.visible = st.d === G.dim && !st.dd && st.mo !== 'spectator';
+    if (!a.bubble) { a.bubble = menuBubble(); a.grp.add(a.bubble); } a.bubble.visible = !!st.mn;
     if (!a.crack) { a.crack = new THREE.Mesh(new THREE.BoxGeometry(1.006, 1.006, 1.006), new THREE.MeshBasicMaterial({ map: crackTextures[0], transparent: true, depthWrite: false, polygonOffset: true, polygonOffsetFactor: -2 })); G.scene.add(a.crack); }
     if (st.bk && a.grp.visible) { a.crack.visible = true; a.crack.position.set(st.bk[0] + 0.5, st.bk[1] + 0.5, st.bk[2] + 0.5); a.crack.material.map = crackTextures[st.bk[3]]; } else a.crack.visible = false;
   }
@@ -7811,13 +7859,17 @@ MOB_CLASS.villager = function (x, y, z) { return new Villager(x, y, z, Math.floo
       if (a.hurtT > 0) a.hurtT -= dt; const red = a.hurtT > 0; if (red !== a.red) { a.red = red; for (const mt of (a.model && a.model.mats) || []) { if (!mt.userData.c0) mt.userData.c0 = mt.color.clone(); mt.color.copy(mt.userData.c0); if (red) mt.color.multiply(new THREE.Color(1, 0.4, 0.4)); } }
       m.legs[0].rotation.x = s; m.legs[1].rotation.x = -s; m.arms[0].rotation.x = -s; a.sw = Math.max(0, (a.sw || 0) - dt * 4); if (st.sw && !a.lastSw) a.sw = 1; a.lastSw = st.sw; m.arms[1].rotation.x = s + Math.sin(a.sw * Math.PI) * 1.4; m.head.rotation.x = (st.pi || 0) * 0.8; } }
   function applyPlayers(list) { const ids = new Set(); for (const st of list) { ids.add(st.id); setAvatar(st.id, st); } for (const id of [...NET.avatars.keys()]) if (!ids.has(id)) dropAvatar(id); }
-  function myState() { const p = G.player; return { id: NET.role === 'host' ? 0 : -1, n: pname(), p: [+p.pos.x.toFixed(2), +p.pos.y.toFixed(2), +p.pos.z.toFixed(2)], y: +p.yaw.toFixed(2), pi: +p.pitch.toFixed(2), d: G.dim, dd: p.dead ? 1 : 0, mo: p.mode, sn: p.sneaking ? 1 : 0, h: p.held ? p.held.id : 0, ar: p.armor.map(s => s ? s.id : 0), sk: S.skin || {}, sw: G.swing > 0.5 ? 1 : 0, bk: G.breaking && G.breaking.prog > 0 ? [G.breaking.x, G.breaking.y, G.breaking.z, clamp(Math.floor(G.breaking.prog * 10), 0, 9)] : 0 }; }
+  function myState() { const p = G.player; return { id: NET.role === 'host' ? 0 : -1, n: pname(), p: [+p.pos.x.toFixed(2), +p.pos.y.toFixed(2), +p.pos.z.toFixed(2)], y: +p.yaw.toFixed(2), pi: +p.pitch.toFixed(2), d: G.dim, dd: p.dead ? 1 : 0, rs: NET.respawns || 0, mn: (UI.open || UI.chatOpen || G.state === 'paused' || G._netPaused) ? (UI.chatOpen ? 2 : 1) : 0, mo: p.mode, sn: p.sneaking ? 1 : 0, h: p.held ? p.held.id : 0, ar: p.armor.map(s => s ? s.id : 0), sk: S.skin || {}, sw: G.swing > 0.5 ? 1 : 0, bk: G.breaking && G.breaking.prog > 0 ? [G.breaking.x, G.breaking.y, G.breaking.z, clamp(Math.floor(G.breaking.prog * 10), 0, 9)] : 0 }; }
   function guestSave() { const p = G.player; return { pos: [p.pos.x, p.pos.y, p.pos.z], yaw: p.yaw, pitch: p.pitch, health: p.health, food: p.food, sat: p.sat, xp: p.xp, level: p.level, inv: p.inv, off: p.off || [null], armor: p.armor, sel: p.sel, mode: p.mode, spawn: p.spawn, effects: p.effects || {}, adv: p.adv || {}, dim: G.dim, kb: (window.MODE_STATE && MODE_STATE.K.best) || 0 }; }
 
   // ---------- PvP (jogador contra jogador) ----------
   const pvpOn = () => NET.role === 'client' ? NET.pvp !== false : !(G.endState && G.endState.pvp === false);
   function pvpHurtMe(d, by, k) { const p = G.player; if (!p || p.dead || !pvpOn()) return; const kb = k ? new THREE.Vector3(k[0], k[1], k[2]) : null; NET.lastHitBy = { n: by || '?', t: performance.now() }; p.damage(d, 'pvp', kb); }
   // quem morreu por outro jogador: avisa todo mundo
+  { const rp = G.respawnPlayer; if (rp) G.respawnPlayer = function () { const r = rp.apply(this, arguments); NET.hostProtUntil = performance.now() + NR.prot; NET.respawns = (NET.respawns || 0) + 1; return r; }; }
+  NET._pvpHit = pvpHit;
+  NET.bodyIn = (x, y, z) => { if (!NET.active()) return false; if (NET.role === 'host') { for (const q of NET.peers) { if (!q.open || !q.st || !q.st.p || q.st.dd || q.st.mo === 'spectator' || q.st.d !== G.dim) continue; const [px, py, pz] = q.st.p; if (px + 0.3 > x && px - 0.3 < x + 1 && py + 1.8 > y && py < y + 1 && pz + 0.3 > z && pz - 0.3 < z + 1) return true; } return false; }
+    for (const a of NET.avatars.values()) { if (!a.grp.visible) continue; const q = a.grp.position; if (q.x + 0.3 > x && q.x - 0.3 < x + 1 && q.y + 1.8 > y && q.y < y + 1 && q.z + 0.3 > z && q.z - 0.3 < z + 1) return true; } return false; };
   const pd = Player.prototype.die; Player.prototype.die = function (src) { const r = pd.apply(this, arguments);
     if (this === G.player && NET.role === 'client' && NET.host && NET.host.open) { sendHost({ t: 'pdie', p: [this.pos.x, this.pos.y, this.pos.z] }); if (G.world && G.world.wtype === 'kitpvp' && window.MODE_STATE) { const K = MODE_STATE.K; if (K.streak) UI.toast((S.lang === 'en' ? 'Streak ended: ' : 'Sequência encerrada: ') + K.streak); K.streak = 0; K.need = true; } }
     if (this === G.player && NET.active() && NET.lastHitBy && performance.now() - NET.lastHitBy.t < 6000) { const m = pname() + tr(' foi derrotado por ', ' was slain by ') + NET.lastHitBy.n; this.deathMsg = m; try { const el = document.getElementById('deathmsg'); if (el) el.textContent = m; } catch (e) { } UI.chat(m, '#f88'); if (NET.role === 'host') toAll({ t: 'chat', m, c: '#f88' }); else sendHost({ t: 'died', m }); NET.lastHitBy = null; }
@@ -7826,7 +7878,7 @@ MOB_CLASS.villager = function (x, y, z) { return new Villager(x, y, z, Math.floo
   function aimAvatar(maxT) { const p = G.player, eye = new THREE.Vector3(p.pos.x, p.eyeY(), p.pos.z), dir = G.lookDir(); let best = null, bt = maxT;
     for (const [id, a] of NET.avatars) { if (!a.grp.visible || !a.st) continue; const q = a.grp.position; const t = segAABB(eye, dir, bt, { x: q.x - 0.35, y: q.y, z: q.z - 0.35 }, { x: q.x + 0.35, y: q.y + 1.85, z: q.z + 0.35 }); if (t >= 0 && t < bt) { bt = t; best = { id, a }; } } return best; }
   function pvpHit(id, a, dmg, kbv) { const k = [kbv.x, Math.max(0.35, kbv.y || 0), kbv.z];
-    if (NET.role === 'host') { const peer = NET.peers.find(x => x.id === id && x.open); if (peer) send(peer, { t: 'hurt', d: dmg, s: 'pvp', k, by: pname() }); }
+    if (NET.role === 'host') { const peer = NET.peers.find(x => x.id === id && x.open); if (peer && !protectedPeer(peer) && peer.st && !peer.st.dd && peer.st.mo !== 'creative' && peer.st.mo !== 'spectator') send(peer, { t: 'hurt', d: dmg, s: 'pvp', k, by: pname() }); }
     else sendHost({ t: 'pvp', to: id, d: dmg, k });
     const q = a.grp.position; Particles.spawn(q.x, q.y + 1.2, q.z, [0.8, 0.1, 0.1], 6, 1.5, 0.5, -1, 0.3); Snd.play('hit', 0.6); a.hurtT = 0.35; }
   const it0 = G.interact; G.interact = function (dt) {
@@ -8360,6 +8412,43 @@ body.touch:not(.taim-cross) #bAtk, body.touch:not(.taim-cross) #bUse{display:non
   loop();
 })();
 
+// ===== BOTÃO DE AÇÃO (celular): olhando para um bicho/veículo, aparece um botão pequeno com o que dá para fazer =====
+(function () {
+  const L = (pt, en) => S.lang === 'en' ? en : pt;
+  const MEATS = ['beef', 'porkchop', 'chicken', 'mutton', 'raw_rabbit', 'rotten_flesh', 'cooked_beef', 'cooked_porkchop', 'cooked_chicken', 'cooked_mutton', 'cooked_rabbit', 'steak'];
+  const HORSE_FOOD = ['wheat', 'apple', 'sugar', 'golden_apple', 'hay', 'carrot'];
+  const CLS = { Villager: typeof Villager !== 'undefined' ? Villager : null, Boat: typeof Boat !== 'undefined' ? Boat : null, Wolf: typeof Wolf !== 'undefined' ? Wolf : null, Horse: typeof Horse !== 'undefined' ? Horse : null, Javardo: typeof Javardo !== 'undefined' ? Javardo : null, ChestCart: typeof ChestCart !== 'undefined' ? ChestCart : (window.ChestCart || null), Minecart: window.Minecart || null };
+  const is = (e, name) => { const C = CLS[name] || window[name]; return !!C && e instanceof C; };
+  function actionFor(e, it, p) {
+    if (!e || e.dead || e.dying || p.riding) return null; const k = it && it.key;
+    if (is(e, 'Villager')) return L('Negociar', 'Trade');
+    if (is(e, 'Boat')) return L('Entrar', 'Board');
+    if (is(e, 'ChestCart')) return L('Abrir', 'Open');
+    if (is(e, 'Minecart')) return L('Entrar', 'Board');
+    if (is(e, 'Wolf')) { if (!e.tame) return k === 'bone' && !e.provoked ? L('Domar', 'Tame') : null; if (k && MEATS.includes(k) && e.hp < 20) return L('Alimentar', 'Feed'); return e.sit ? L('Levantar', 'Stand') : L('Sentar', 'Sit'); }
+    if (is(e, 'Horse')) { if (it && it.saddle) return e.tame && !e.saddled ? L('Selar', 'Saddle') : null; if (k && HORSE_FOOD.includes(k)) return L('Alimentar', 'Feed'); return e.tame ? L('Cavalgar', 'Ride') : L('Montar', 'Mount'); }
+    if (e.type === 'mooshroom' && k === 'bowl') return L('Encher tigela', 'Fill bowl');
+    if ((e.type === 'cow' || e.type === 'mooshroom') && k === 'bucket') return L('Ordenhar', 'Milk');
+    if (is(e, 'Javardo') && k === 'gold_ingot' && !e.provoked && !(e.admire > 0)) return L('Negociar', 'Barter');
+    return null; }
+  const st = document.createElement('style'); st.textContent = `
+#actbtn{position:absolute;left:50%;bottom:calc(var(--s) * 2.6 + 34px);transform:translateX(-50%);display:none;pointer-events:auto;touch-action:none;z-index:12;
+  font:inherit;font-size:22px;color:#fff;text-shadow:2px 2px 0 #222;padding:6px 22px;min-width:120px;background:rgba(30,30,30,.62);border:2px solid #000;box-shadow:inset 2px 2px 0 rgba(255,255,255,.28),inset -2px -2px 0 rgba(0,0,0,.4)}
+#actbtn.on,#actbtn.prs{background:rgba(110,170,80,.8)}
+body.touch #actbtn.show{display:block}`;
+  document.head.appendChild(st);
+  const b = document.createElement('button'); b.id = 'actbtn'; b.setAttribute('data-noi18n', ''); document.getElementById('hud').appendChild(b);
+  let cur = null, lbl = '';
+  b.addEventListener('pointerdown', ev => { ev.preventDefault(); ev.stopPropagation(); if (!cur || G.worldLocked()) return; b.classList.add('on'); Snd.init();
+    const keep = G.entTarget; G.entTarget = cur; G.target = null; G.mouse.r = true; G.rPressed = true;
+    try { G.use(); } finally { G.rPressed = false; G.mouse.r = false; if (!G.entTarget) G.entTarget = keep; } G.swing = 1; });
+  const up = () => b.classList.remove('on'); b.addEventListener('pointerup', up); b.addEventListener('pointercancel', up); b.addEventListener('lostpointercapture', up);
+  (function loop() { requestAnimationFrame(loop); const p = G.player;
+    let a = null; if (p && G.state === 'play' && !G.worldLocked()) { const e = G.entTarget; const s = p.held, it = s ? IT[s.id] : null; a = actionFor(e, it, p); cur = a ? e : null; } else cur = null;
+    if (a !== lbl) { lbl = a; if (a) { b.textContent = a; b.classList.add('show'); } else b.classList.remove('show'); } })();
+  window.actionFor = actionFor;
+})();
+
 // ===== FORNALHA: chama de verdade (desenho de pixel) que vai apagando, seta que enche e casas maiores =====
 (function () {
   const FLAME = 'polygon(45% 0,55% 0,55% 12%,62% 12%,62% 24%,72% 24%,72% 36%,82% 36%,82% 48%,90% 48%,90% 84%,82% 84%,82% 92%,72% 92%,72% 100%,28% 100%,28% 92%,18% 92%,18% 84%,10% 84%,10% 54%,18% 54%,18% 42%,28% 42%,28% 54%,36% 54%,36% 30%,45% 30%)';
@@ -8402,6 +8491,36 @@ body.touch:not(.taim-cross) #bAtk, body.touch:not(.taim-cross) #bUse{display:non
   cv.addEventListener('touchstart', () => { if (G.worldLocked()) G.needLift = true; }, { passive: true, capture: true });
   // perder o foco (trocar de app, notificação) solta tudo
   window.addEventListener('blur', () => clearActs(G)); document.addEventListener('visibilitychange', () => { if (document.hidden) clearActs(G); });
+})();
+
+// ===== REGRA GLOBAL DE TOQUE: nada fica "preso" selecionado/apertado, e nada de azul de navegador =====
+(function () {
+  const touchDev = matchMedia('(hover: none)').matches || (IS_TOUCH && !matchMedia('(pointer: fine)').matches);
+  const st = document.createElement('style');
+  st.textContent = `
+::selection{background:rgba(108,204,84,.55);color:#fff}
+input,textarea{caret-color:#8f8}
+*{-webkit-tap-highlight-color:transparent}
+input:focus,textarea:focus,button:focus{outline:none}
+input:focus-visible{box-shadow:0 0 0 2px #8f8}`;
+  document.head.appendChild(st);
+  // no celular o "passar o mouse por cima" não existe: o visual de destaque só aparece enquanto o dedo está apertando
+  if (touchDev) {
+    const fix = sheet => { let rules; try { rules = sheet.cssRules; } catch (e) { return; } if (!rules) return;
+      for (const r of rules) { if (r.cssRules && !r.selectorText) fix(r); else if (r.selectorText && r.selectorText.includes(':hover')) r.selectorText = r.selectorText.replace(/:hover/g, '.prs'); } };
+    const all = () => { for (const s of document.styleSheets) fix(s); };
+    all(); new MutationObserver(ms => { if (ms.some(m => [...m.addedNodes].some(n => n.tagName === 'STYLE'))) setTimeout(all, 0); }).observe(document.head, { childList: true });
+  }
+  const SEL = '.btn,button,.slot,.rb,.ctab,.wclose,.tb,.bookbtn,.wl-item,.tog,label';
+  const held = new Map(); // dedo → elemento apertado
+  window.addEventListener('pointerdown', e => { const el = e.target && e.target.closest && e.target.closest(SEL); if (!el) return; el.classList.add('prs'); held.set(e.pointerId, el); }, true);
+  const up = e => { const el = held.get(e.pointerId); if (el) { el.classList.remove('prs'); held.delete(e.pointerId); }
+    // botão de menu não fica com cara de selecionado depois que o dedo sai
+    const a = document.activeElement; if (touchDev && a && a !== document.body && !/^(INPUT|TEXTAREA|SELECT)$/.test(a.tagName)) a.blur(); };
+  window.addEventListener('pointerup', up, true); window.addEventListener('pointercancel', up, true);
+  // trocar de app/aba ou perder o foco solta tudo que estava apertado
+  const releaseAll = () => { for (const el of held.values()) el.classList.remove('prs'); held.clear(); document.querySelectorAll('#touchui .on').forEach(el => { if (el.id !== 'bSneak' || !G.touchSneak) el.classList.remove('on'); }); };
+  window.addEventListener('blur', releaseAll); document.addEventListener('visibilitychange', () => { if (document.hidden) releaseAll(); });
 })();
 </script>
 </body>
