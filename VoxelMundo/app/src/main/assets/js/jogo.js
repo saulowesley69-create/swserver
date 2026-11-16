@@ -300,7 +300,11 @@ tile('torch', (px, r) => { for (let y = 0; y < 16; y++) for (let x = 0; x < 16; 
 tile('glowstone', (px, r) => { for (let y = 0; y < 16; y++) for (let x = 0; x < 16; x++) { const k = r(); px(x, y, k < 0.25 ? [140, 100, 40] : k < 0.6 ? vary([230, 180, 80], r, 20) : vary([255, 230, 140], r, 20)); } });
 tile('pumpkin_side', (px, r) => { for (let y = 0; y < 16; y++) for (let x = 0; x < 16; x++) px(x, y, vary(x % 4 === 0 ? [190, 110, 20] : [225, 135, 25], r, 14)); });
 tile('pumpkin_top', (px, r) => { for (let y = 0; y < 16; y++) for (let x = 0; x < 16; x++) { const d = Math.hypot(x - 7.5, y - 7.5); px(x, y, d < 2 ? [100, 80, 30] : vary(Math.floor(d) % 3 === 0 ? [190, 110, 20] : [225, 135, 25], r, 12)); } });
-tile('melon_side', (px, r) => { for (let y = 0; y < 16; y++) for (let x = 0; x < 16; x++) px(x, y, vary((x + (y >> 2)) % 5 === 0 ? [160, 190, 40] : [100, 150, 30], r, 15)); });
+// melancia: casca verde-escura com listras claras onduladas (lado) e listras indo até o cabinho (topo)
+tile('melon_side', (px, r) => { for (let y = 0; y < 16; y++) for (let x = 0; x < 16; x++) { const w = Math.round(Math.sin(y * 0.9 + (x >> 2)) * 0.8); const sx = (x + w + 16) % 4;
+  const c = sx === 0 ? [136, 186, 64] : sx === 1 ? [92, 150, 44] : [52, 102, 30]; px(x, y, vary(c, r, 10)); } });
+tile('melon_top', (px, r) => { for (let y = 0; y < 16; y++) for (let x = 0; x < 16; x++) { const dx = x - 7.5, dy = y - 7.5, d = Math.hypot(dx, dy), a = Math.atan2(dy, dx); const st = Math.floor(((a / (Math.PI * 2)) * 16 + 16 + Math.sin(d * 0.7)) % 4);
+  let c = st === 0 ? [136, 186, 64] : st === 1 ? [92, 150, 44] : [52, 102, 30]; if (d < 1.6) c = [104, 80, 44]; else if (d < 2.6) c = [70, 122, 36]; px(x, y, vary(c, r, 9)); } });
 tile('clay', noiseFill([160, 166, 178], 12));
 tile('mossy_cobble', (px, r, g) => { voronoi(px, r, [122, 122, 122], 14, 9, 0.9); for (let i = 0; i < 40; i++) px(r() * 16 | 0, r() * 16 | 0, vary([80, 120, 60], r, 20)); });
 tile('lapis_ore', (px, r) => { P_STONE(px, r); for (let i = 0; i < 6; i++) { const x = 1 + r() * 13 | 0, y = 1 + r() * 13 | 0; px(x, y, [30, 60, 170]); px(x + 1, y, [40, 80, 200]); px(x, y + 1, [20, 40, 130]); } });
@@ -652,7 +656,7 @@ defBlock(46, 'tnt', 'TNT', { t: { top: 'tnt_top', side: 'tnt_side', bottom: 'tnt
 defBlock(47, 'torch', 'Tocha', { solid: false, opaque: false, torch: true, hard: 0, light: 14, snd: 'wood' });
 defBlock(48, 'glowstone', 'Pedra-Lume', { hard: 0.3, light: 15, snd: 'glass', drop: 'glowstone_dust', dropCount: [2, 4] });
 defBlock(49, 'pumpkin', 'Abóbora', { t: { top: 'pumpkin_top', side: 'pumpkin_side' }, hard: 1, tool: 'axe', snd: 'wood' });
-defBlock(50, 'melon', 'Melancia', { t: { top: 'pumpkin_top', side: 'melon_side' }, hard: 1, tool: 'axe', drop: 'melon_slice', dropCount: [3, 7], snd: 'wood' });
+defBlock(50, 'melon', 'Melancia', { t: { top: 'melon_top', side: 'melon_side' }, hard: 1, tool: 'axe', drop: 'melon_slice', dropCount: [3, 7], snd: 'wood' });
 defBlock(51, 'clay', 'Argila', { hard: 0.6, tool: 'shovel', drop: 'clay_ball', dropCount: [4, 4], snd: 'dirt' });
 defBlock(52, 'mossy_cobble', 'Pedra Bruta Musgosa', { hard: 2, tool: 'pickaxe', tier: 0 });
 defBlock(53, 'lapis_ore', 'Minério de Lápis-Lazúli', { hard: 3, tool: 'pickaxe', tier: 1, drop: 'lapis', dropCount: [4, 8], xp: 3 });
