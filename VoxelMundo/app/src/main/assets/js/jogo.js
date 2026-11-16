@@ -4512,8 +4512,10 @@ const G = {
     const meta = { id, name: o.name || 'Novo Mundo', seed: s, mode: o.mode, last: Date.now(), difficulty: o.difficulty, cheats: o.cheats, keepInv: o.keepInv || o.type === 'arena' || o.type === 'kitpvp', gen: 5, type: o.type || 'normal' };
     const ws = this.listWorlds(); ws.push(meta); this.setWorlds(ws); this.startGame(meta, null);
   },
-  loadWorld(id) { const meta = this.listWorlds().find(w => w.id === id); if (!meta) return; let data = null; try { data = JSON.parse(localStorage.getItem('vm_w_' + id)); } catch (e) { } this.startGame(meta, data); },
-  deleteWorld(id) { this.setWorlds(this.listWorlds().filter(w => w.id !== id)); try { localStorage.removeItem('vm_w_' + id); } catch (e) { } },
+  readWorldData(meta) { try { return JSON.parse(localStorage.getItem('vm_w_' + meta.id)); } catch (e) { return null; } },
+  removeWorldData(meta) { try { localStorage.removeItem('vm_w_' + meta.id); } catch (e) { } },
+  loadWorld(id) { const meta = this.listWorlds().find(w => w.id === id); if (!meta) return; Promise.resolve(this.readWorldData(meta)).then(data => this.startGame(meta, data), () => this.startGame(meta, null)); },
+  deleteWorld(id) { const meta = this.listWorlds().find(w => w.id === id); this.setWorlds(this.listWorlds().filter(w => w.id !== id)); if (meta) this.removeWorldData(meta); },
   startGame(meta, data) {
     this.booting = 0; $('#boot').classList.add('hidden');
     this.clearWorld(); this.meta = meta; this.worlds = {}; this.fluidQ = []; this.simT = 0; this.portalT = 0; this.portalCool = false;
@@ -4543,7 +4545,10 @@ const G = {
       if (e instanceof ItemDrop) ents.push({ t: '#item', p: P, s: e.stack, l: Math.round(e.life) });
       else if (e instanceof Mob && [Mob, Fish, Rabbit, Bat, Slime, Wolf, Horse, Boat, window.Minecart].includes(e.constructor) && MOB_TYPES[e.type]) ents.push({ t: e.type, p: P, hp: e.hp, z: e.size, y: +e.yaw.toFixed(2), x: e.saveX ? e.saveX() : undefined }); }
     data.vchest = this.vchest || null; data.player.effects = p.effects || {}; data.player.adv = p.adv || {}; data.player.attrs = p.attrs || {}; data.player.absorb = p.absorb || 0; data.ents = ents; data.raining = !!this.raining; data.weatherT = this.weatherT; data.player.air = p.air; data.player.fallDist = p.fallDist;
-    const json = JSON.stringify(data);
+    this.persistWorld(data);
+  },
+  // guardar/ler/apagar o mundo (a versão em pastas troca isso por arquivos de verdade)
+  persistWorld(data) { const p = this.player; const json = JSON.stringify(data);
     try { localStorage.setItem('vm_w_' + this.meta.id, json); const ws = this.listWorlds(); const m = ws.find(w => w.id === this.meta.id); if (m) { m.last = Date.now(); m.mode = this.hardcore ? 'hardcore' : p.mode; } this.setWorlds(ws); } catch (e) { try { data.ents = []; localStorage.setItem('vm_w_' + this.meta.id, JSON.stringify(data)); } catch (e2) { if (!this.saveWarn || performance.now() - this.saveWarn > 30000) { this.saveWarn = performance.now(); UI.toast('Não foi possível salvar (armazenamento cheio)'); } } }
   },
   // recria as entidades salvas quando o chunk delas já estiver carregado
@@ -8282,6 +8287,167 @@ body.touch #actbtn.show{display:block}`;
   cv.addEventListener('touchstart', () => { if (G.worldLocked()) G.needLift = true; else G.needLift = false; }, { passive: true, capture: true });
   // perder o foco (trocar de app, notificação) solta tudo
   window.addEventListener('blur', () => clearActs(G)); document.addEventListener('visibilitychange', () => { if (document.hidden) clearActs(G); });
+})();
+
+// ===== MUNDOS EM PASTA =====
+// Cada mundo é uma pasta:  mundos/<Nome>/  mundo.json · jogador.json · entidades.json · regioes/<dimensão>.json · icone.png
+// APK: pasta de verdade no celular (Documentos/VoxelMundo/mundos, ou outra que o jogador escolher) pela ponte VMFS do app.
+// Navegador: pasta privada do site (OPFS), com Exportar/Importar .zip. Sem nenhum dos dois: o jeito antigo (localStorage).
+(function () {
+  const en = () => S.lang === 'en', L = (pt, e) => en() ? e : pt;
+  // ---------- "discos" ----------
+  const nativeFS = window.VMFS ? {
+    kind: 'native',
+    read: async p => { const r = VMFS.read(p); return r === null || r === undefined || r === '\u0000' ? null : r; },
+    write: async (p, t) => { if (!VMFS.write(p, t)) throw new Error('write ' + p); },
+    writeB64: async (p, b) => { if (!VMFS.writeB64(p, b)) throw new Error('write ' + p); },
+    readB64: async p => { const r = VMFS.readB64(p); return r || null; },
+    list: async p => { try { return JSON.parse(VMFS.list(p) || '[]'); } catch (e) { return []; } },
+    remove: async p => { VMFS.remove(p); },
+    where: () => VMFS.where()
+  } : null;
+  const opfsFS = (navigator.storage && navigator.storage.getDirectory) ? (() => {
+    const dir = async (parts, create) => { let d = await navigator.storage.getDirectory(); for (const x of parts) d = await d.getDirectoryHandle(x, { create }); return d; };
+    const split = p => { const a = p.split('/').filter(Boolean); return [a.slice(0, -1), a[a.length - 1]]; };
+    const putBlob = async (p, data) => { const [ds, f] = split(p); const d = await dir(ds, true); const h = await d.getFileHandle(f, { create: true }); const w = await h.createWritable(); await w.write(data); await w.close(); };
+    return { kind: 'opfs',
+      read: async p => { try { const [ds, f] = split(p); const d = await dir(ds, false); return await (await (await d.getFileHandle(f)).getFile()).text(); } catch (e) { return null; } },
+      write: (p, t) => putBlob(p, new Blob([t], { type: 'application/json' })),
+      writeB64: (p, b) => putBlob(p, new Blob([Uint8Array.from(atob(b), c => c.charCodeAt(0))])),
+      readB64: async p => { try { const [ds, f] = split(p); const d = await dir(ds, false); const ab = await (await (await d.getFileHandle(f)).getFile()).arrayBuffer(); let s = ''; const u = new Uint8Array(ab); for (let i = 0; i < u.length; i += 0x8000) s += String.fromCharCode.apply(null, u.subarray(i, i + 0x8000)); return btoa(s); } catch (e) { return null; } },
+      list: async p => { try { const d = await dir(p.split('/').filter(Boolean), false); const out = []; for await (const [n, h] of d.entries()) if (h.kind === 'directory') out.push(n); return out; } catch (e) { return []; } },
+      remove: async p => { try { const [ds, f] = split(p); const d = await dir(ds, false); await d.removeEntry(f, { recursive: true }); } catch (e) { } },
+      where: () => L('Pasta do jogo no navegador', 'Game folder in the browser') };
+  })() : null;
+  let FS = null;
+  const WS = window.WorldStore = { cache: [], ready: false, kind: 'local' };
+  const safeName = n => (String(n || 'Mundo').replace(/[\\/:*?"<>|\u0000-\u001f]/g, '_').replace(/\s+/g, ' ').trim().replace(/^\.+/, '').slice(0, 40) || 'Mundo');
+  const uniqueFolder = name => { const used = new Set(WS.cache.map(m => m.folder)); let f = safeName(name), i = 2; while (used.has(f)) f = safeName(name) + ' (' + (i++) + ')'; return f; };
+  const base = m => 'mundos/' + m.folder + '/';
+  const DIMS = ['overworld', 'nether', 'end'];
+  const metaOnly = m => { const o = Object.assign({}, m); delete o.folder; delete o.icon; return o; };
+
+  async function writeWorld(meta, data, iconB64) {
+    const b = base(meta), st = { v: data.v, endState: data.endState, time: data.time, day: data.day, difficulty: data.difficulty, dim: data.dim, raining: data.raining, weatherT: data.weatherT, vchest: data.vchest };
+    // jogador e entidades primeiro, mundo.json por último (se algo der errado no meio, o mundo antigo continua inteiro)
+    await FS.write(b + 'jogador.json', JSON.stringify(data.player));
+    await FS.write(b + 'entidades.json', JSON.stringify(data.ents || []));
+    for (const d in (data.dims || {})) await FS.write(b + 'regioes/' + d + '.json', JSON.stringify(data.dims[d]));
+    if (iconB64) await FS.writeB64(b + 'icone.png', iconB64);
+    await FS.write(b + 'mundo.json', JSON.stringify({ formato: 1, jogo: 'VoxelMundo', meta: metaOnly(meta), estado: st }, null, 1));
+  }
+  async function readWorld(meta) {
+    const b = base(meta); const mj = await FS.read(b + 'mundo.json'); if (!mj) return null; const w = JSON.parse(mj), st = w.estado || {};
+    const pj = await FS.read(b + 'jogador.json'); if (!pj) return null; // mundo novo que ainda não foi salvo
+    const data = Object.assign({}, st, { player: JSON.parse(pj), ents: JSON.parse((await FS.read(b + 'entidades.json')) || '[]'), dims: {} });
+    for (const d of DIMS) { const r = await FS.read(b + 'regioes/' + d + '.json'); if (r) data.dims[d] = JSON.parse(r); }
+    return data;
+  }
+  async function scan() { const out = []; for (const f of await FS.list('mundos')) { try { const mj = await FS.read('mundos/' + f + '/mundo.json'); if (!mj) continue; const w = JSON.parse(mj); if (!w.meta || !w.meta.id) continue; const m = Object.assign({}, w.meta, { folder: f }); out.push(m); } catch (e) { } }
+    // ícones (miniaturas) em segundo plano
+    for (const m of out) FS.readB64(base(m) + 'icone.png').then(b => { if (b) { m.icon = 'data:image/png;base64,' + b; if (UI.renderWorlds && document.getElementById('s-worlds') && !document.getElementById('s-worlds').classList.contains('hidden')) UI.renderWorlds(); } }).catch(() => { });
+    return out; }
+  // mundos antigos (guardados no navegador) passam para pastas, sem apagar o original
+  async function migrate() { let old = []; try { old = JSON.parse(localStorage.getItem('vm_worlds') || '[]'); } catch (e) { }
+    let done = {}; try { done = JSON.parse(localStorage.getItem('vm_migrated') || '{}'); } catch (e) { }
+    let n = 0; for (const m of old) { if (done[m.id] || WS.cache.some(c => c.id === m.id)) continue; let data = null; try { data = JSON.parse(localStorage.getItem('vm_w_' + m.id)); } catch (e) { }
+      const meta = Object.assign({}, m, { folder: uniqueFolder(m.name) }); WS.cache.push(meta);
+      try { if (data) await writeWorld(meta, data); else await FS.write(base(meta) + 'mundo.json', JSON.stringify({ formato: 1, jogo: 'VoxelMundo', meta: metaOnly(meta), estado: {} })); done[m.id] = 1; n++; } catch (e) { WS.cache = WS.cache.filter(x => x !== meta); } }
+    try { localStorage.setItem('vm_migrated', JSON.stringify(done)); } catch (e) { } return n; }
+
+  WS.init = async function (fsOverride) {
+    FS = fsOverride || nativeFS || opfsFS; if (!FS) { WS.ready = true; return; }
+    try { if (FS.kind === 'opfs') { await FS.write('mundos/.teste', '1'); await FS.remove('mundos/.teste'); } } catch (e) { FS = null; WS.ready = true; return; } // navegador sem suporte: fica no jeito antigo
+    WS.kind = FS.kind; WS.cache = await scan(); const n = await migrate(); WS.ready = true;
+    if (n) UI.toast && UI.toast(L(n + ' mundo(s) passaram para pastas', n + ' world(s) moved to folders'));
+    if (UI.renderWorlds && document.getElementById('worldlist')) UI.renderWorlds(); };
+  WS.where = () => FS ? FS.where() : L('Navegador (antigo)', 'Browser (old)');
+
+  // ---------- liga no jogo ----------
+  const lw = G.listWorlds, sw = G.setWorlds, rw = G.readWorldData, pw = G.persistWorld, dw = G.removeWorldData;
+  G.listWorlds = function () { return FS ? WS.cache.slice() : lw.call(this); };
+  G.setWorlds = function (ws) { if (!FS) return sw.call(this, ws);
+    for (const m of ws) if (!m.folder) { m.folder = uniqueFolder(m.name); FS.write(base(m) + 'mundo.json', JSON.stringify({ formato: 1, jogo: 'VoxelMundo', meta: metaOnly(m), estado: {} }, null, 1)).catch(() => { }); }
+    WS.cache = ws.slice(); };
+  G.readWorldData = function (meta) { if (!FS) return rw.call(this, meta); UI.toast && UI.toast(L('Abrindo o mundo...', 'Opening world...')); return readWorld(meta).catch(e => { console.error(e); return null; }); };
+  G.removeWorldData = function (meta) { if (!FS) return dw.call(this, meta); if (meta.folder) FS.remove('mundos/' + meta.folder).catch(() => { }); };
+  let saving = Promise.resolve();
+  G.persistWorld = function (data) { if (!FS) return pw.call(this, data);
+    const meta = WS.cache.find(m => m.id === this.meta.id) || Object.assign(this.meta, { folder: this.meta.folder || uniqueFolder(this.meta.name) }); if (!WS.cache.includes(meta)) WS.cache.push(meta);
+    meta.last = Date.now(); meta.mode = this.hardcore ? 'hardcore' : this.player.mode;
+    const snap = JSON.parse(JSON.stringify(data)); // cópia: o jogo continua mudando os dados enquanto salva
+    let icon = null; try { if (this.state === 'play' && this.renderer) { this.render(); const c = document.createElement('canvas'); c.width = 160; c.height = 90; const src = this.renderer.domElement, k = Math.max(160 / src.width, 90 / src.height), w = src.width * k, h = src.height * k; c.getContext('2d').drawImage(src, (160 - w) / 2, (90 - h) / 2, w, h); icon = c.toDataURL('image/png').split(',')[1]; meta.icon = 'data:image/png;base64,' + icon; } } catch (e) { }
+    saving = saving.then(() => writeWorld(meta, snap, icon)).catch(e => { console.error(e); if (!this.saveWarn || performance.now() - this.saveWarn > 30000) { this.saveWarn = performance.now(); UI.toast(L('Não foi possível salvar o mundo na pasta', 'Could not save the world to the folder')); } });
+    return saving; };
+  WS.flush = () => saving;
+
+  // ---------- exportar / importar (.zip com a mesma pasta) ----------
+  const CRC = (() => { const t = new Uint32Array(256); for (let n = 0; n < 256; n++) { let c = n; for (let k = 0; k < 8; k++) c = c & 1 ? 0xedb88320 ^ (c >>> 1) : c >>> 1; t[n] = c >>> 0; } return u => { let c = 0xffffffff; for (let i = 0; i < u.length; i++) c = t[(c ^ u[i]) & 255] ^ (c >>> 8); return (c ^ 0xffffffff) >>> 0; }; })();
+  function zip(files) { // files: [[nome, Uint8Array]] — sem compressão (abre em qualquer programa)
+    const enc = new TextEncoder(), parts = [], cen = []; let off = 0;
+    for (const [name, data] of files) { const nb = enc.encode(name), crc = CRC(data), h = new DataView(new ArrayBuffer(30));
+      h.setUint32(0, 0x04034b50, true); h.setUint16(4, 20, true); h.setUint16(6, 0x0800, true); h.setUint32(14, crc, true); h.setUint32(18, data.length, true); h.setUint32(22, data.length, true); h.setUint16(26, nb.length, true);
+      parts.push(new Uint8Array(h.buffer), nb, data); const c = new DataView(new ArrayBuffer(46)); c.setUint32(0, 0x02014b50, true); c.setUint16(4, 20, true); c.setUint16(6, 20, true); c.setUint16(8, 0x0800, true); c.setUint32(16, crc, true); c.setUint32(20, data.length, true); c.setUint32(24, data.length, true); c.setUint16(28, nb.length, true); c.setUint32(42, off, true);
+      cen.push(new Uint8Array(c.buffer), nb); off += 30 + nb.length + data.length; }
+    const cs = cen.reduce((a, b) => a + b.length, 0), e = new DataView(new ArrayBuffer(22)); e.setUint32(0, 0x06054b50, true); e.setUint16(8, files.length, true); e.setUint16(10, files.length, true); e.setUint32(12, cs, true); e.setUint32(16, off, true);
+    return new Blob([...parts, ...cen, new Uint8Array(e.buffer)], { type: 'application/zip' }); }
+  async function unzip(buf) { const u = new Uint8Array(buf), v = new DataView(buf), out = {}; let e = u.length - 22; while (e >= 0 && v.getUint32(e, true) !== 0x06054b50) e--; if (e < 0) throw new Error('zip');
+    let p = v.getUint32(e + 16, true); const n = v.getUint16(e + 10, true), dec = new TextDecoder();
+    for (let i = 0; i < n; i++) { const meth = v.getUint16(p + 10, true), csz = v.getUint32(p + 20, true), nl = v.getUint16(p + 28, true), xl = v.getUint16(p + 30, true), cl = v.getUint16(p + 32, true), lo = v.getUint32(p + 42, true); const name = dec.decode(u.subarray(p + 46, p + 46 + nl)); p += 46 + nl + xl + cl;
+      const lnl = v.getUint16(lo + 26, true), lxl = v.getUint16(lo + 28, true), st = lo + 30 + lnl + lxl; let data = u.subarray(st, st + csz);
+      if (meth === 8) data = new Uint8Array(await new Response(new Blob([data]).stream().pipeThrough(new DecompressionStream('deflate-raw'))).arrayBuffer()); else if (meth !== 0) continue; out[name] = data; }
+    return out; }
+  WS.exportZip = async function (id) { const meta = WS.cache.find(m => m.id === id); if (!meta || !FS) return null; const data = await readWorld(meta); if (!data) return null; const enc = new TextEncoder(), f = meta.folder + '/';
+    const files = [[f + 'mundo.json', enc.encode(JSON.stringify({ formato: 1, jogo: 'VoxelMundo', meta: metaOnly(meta), estado: { v: data.v, endState: data.endState, time: data.time, day: data.day, difficulty: data.difficulty, dim: data.dim, raining: data.raining, weatherT: data.weatherT, vchest: data.vchest } }, null, 1))],
+      [f + 'jogador.json', enc.encode(JSON.stringify(data.player))], [f + 'entidades.json', enc.encode(JSON.stringify(data.ents || []))]];
+    for (const d in data.dims) files.push([f + 'regioes/' + d + '.json', enc.encode(JSON.stringify(data.dims[d]))]);
+    const ic = await FS.readB64(base(meta) + 'icone.png'); if (ic) files.push([f + 'icone.png', Uint8Array.from(atob(ic), c => c.charCodeAt(0))]);
+    return { blob: zip(files), name: safeName(meta.name) + '.zip' }; };
+  WS.importZip = async function (file) { if (!FS) throw new Error('nofs'); const all = await unzip(await file.arrayBuffer()); const dec = new TextDecoder();
+    const mk = Object.keys(all).find(k => /(^|\/)mundo\.json$/.test(k)); if (!mk) throw new Error('sem mundo.json'); const pre = mk.slice(0, -'mundo.json'.length);
+    const w = JSON.parse(dec.decode(all[mk])); if (!w.meta) throw new Error('formato');
+    const meta = Object.assign({}, w.meta, { id: Date.now().toString(36) + Math.random().toString(36).slice(2, 6), last: Date.now() }); if (WS.cache.some(m => m.name === meta.name)) meta.name += L(' (importado)', ' (imported)');
+    meta.folder = uniqueFolder(meta.name); const b = base(meta);
+    for (const k in all) { if (!k.startsWith(pre) || k.endsWith('/')) continue; const rel = k.slice(pre.length); if (rel === 'mundo.json') continue; if (/\.png$/.test(rel)) { let s = ''; const u = all[k]; for (let i = 0; i < u.length; i += 0x8000) s += String.fromCharCode.apply(null, u.subarray(i, i + 0x8000)); await FS.writeB64(b + rel, btoa(s)); } else await FS.write(b + rel, dec.decode(all[k])); }
+    await FS.write(b + 'mundo.json', JSON.stringify({ formato: 1, jogo: 'VoxelMundo', meta: metaOnly(meta), estado: w.estado || {} }, null, 1));
+    WS.cache.push(meta); return meta; };
+
+  // ---------- tela de mundos: miniatura, Exportar, Importar ----------
+  const st = document.createElement('style'); st.textContent = `#worldlist .world{display:flex;gap:10px;align-items:center}#worldlist .wico{width:96px;height:54px;flex:none;background:#000 center/cover;border:2px solid #000;image-rendering:auto}#worldlist .wtx{min-width:0;flex:1}#wsWhere{font-size:15px;color:#bbb;text-align:center;margin:4px 0}`;
+  document.head.appendChild(st);
+  const rws = UI.renderWorlds; UI.renderWorlds = function () { rws.apply(this, arguments); const ws = G.listWorlds(); const list = document.getElementById('worldlist');
+    [...list.querySelectorAll('.world')].forEach((d, i) => { const w = ws.slice().sort((a, b) => b.last - a.last)[i]; if (!w) return; const ic = document.createElement('div'); ic.className = 'wico'; if (w.icon) ic.style.backgroundImage = 'url(' + w.icon + ')'; const tx = document.createElement('div'); tx.className = 'wtx'; while (d.firstChild) tx.appendChild(d.firstChild); d.append(ic, tx); });
+    let wh = document.getElementById('wsWhere'); if (!wh) { wh = document.createElement('div'); wh.id = 'wsWhere'; list.after(wh); } wh.textContent = (FS ? '📁 ' : '') + L('Mundos salvos em: ', 'Worlds saved in: ') + WS.where();
+    addButtons(); };
+  function addButtons() { if (!FS || document.getElementById('wExport')) return; const row = document.querySelector('#s-worlds .brow:last-of-type') || document.getElementById('wPlay').parentNode;
+    const mk = (id, pt, e2, fn) => { const b = document.createElement('button'); b.className = 'btn'; b.id = id; b.textContent = L(pt, e2); b.onclick = () => { Snd.play('click'); fn(); }; return b; };
+    const r2 = document.createElement('div'); r2.className = 'brow';
+    r2.append(mk('wExport', 'Exportar', 'Export', async () => { if (!UI.selWorld) return UI.toast(L('Selecione um mundo', 'Select a world')); await WS.flush(); const r = await WS.exportZip(UI.selWorld); if (!r) return UI.toast(L('Não deu para exportar', 'Could not export'));
+        if (window.VMFS && VMFS.saveDownload) { const fr = new FileReader(); fr.onload = () => { const ok = VMFS.saveDownload(r.name, String(fr.result).split(',')[1]); UI.toast(ok ? L('Salvo em Downloads: ', 'Saved to Downloads: ') + r.name : L('Não deu para salvar', 'Could not save')); }; fr.readAsDataURL(r.blob); return; }
+        const a = document.createElement('a'); a.href = URL.createObjectURL(r.blob); a.download = r.name; document.body.appendChild(a); a.click(); setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 2000); }),
+      mk('wImport', 'Importar', 'Import', () => { const inp = document.createElement('input'); inp.type = 'file'; inp.accept = '.zip,application/zip'; inp.onchange = async () => { const f = inp.files[0]; if (!f) return; try { const m = await WS.importZip(f); UI.selWorld = m.id; UI.renderWorlds(); UI.toast(L('Mundo importado: ', 'World imported: ') + m.name); } catch (e) { console.error(e); UI.toast(L('Esse arquivo não é um mundo do VoxelMundo', 'This file is not a VoxelMundo world')); } }; inp.click(); }));
+    row.after(r2); }
+  // salva antes de fechar/trocar de app
+  document.addEventListener('visibilitychange', () => { if (document.hidden && G.state === 'play') try { G.saveWorld(); } catch (e) { } });
+  WS.init();
+})();
+// ---------- Opções → "Local dos mundos" (só no app do celular) ----------
+(function () {
+  if (!window.VMFS) return; const L = (pt, e) => S.lang === 'en' ? e : pt;
+  const panel = () => { let p = document.getElementById('wsLoc'); if (p) return p; p = document.createElement('div'); p.id = 'wsLoc'; p.className = 'screen';
+    p.style.cssText = 'position:fixed;inset:0;z-index:95;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:8px;background:rgba(0,0,0,.82)'; document.body.appendChild(p); return p; };
+  const open = () => { const p = panel(); p.innerHTML = ''; p.style.display = 'flex';
+    const t = document.createElement('h2'); t.textContent = L('Local dos mundos', 'World save location'); const now = document.createElement('div'); now.style.cssText = 'color:#ddd;font-size:19px;margin-bottom:6px'; now.textContent = L('Agora: ', 'Now: ') + VMFS.where();
+    const b = (txt, fn) => { const x = document.createElement('button'); x.className = 'btn'; x.textContent = txt; x.onclick = () => { Snd.play('click'); fn(); }; p.appendChild(x); };
+    p.append(t, now);
+    const done = ok => { p.style.display = 'none'; if (ok) { UI.toast(L('Mundos agora em: ', 'Worlds now in: ') + VMFS.where()); WorldStore.init(); } else UI.toast(L('Não deu para usar essa pasta', 'Could not use that folder')); };
+    b(L('Documentos/VoxelMundo (padrão)', 'Documents/VoxelMundo (default)'), () => done(VMFS.useDocuments()));
+    b(L('Escolher outra pasta...', 'Choose another folder...'), () => { window.onVMFSFolder = r => { if (r === 'cancelado') return; done(r === 'ok'); }; VMFS.pickFolder(); });
+    b(L('Pasta privada do app', 'Private app folder'), () => done(VMFS.useAppFolder()));
+    const n = document.createElement('div'); n.style.cssText = 'color:#aaa;font-size:16px;max-width:560px;text-align:center'; n.textContent = L('Os mundos que já existem são copiados para o novo lugar.', 'Existing worlds are copied to the new place.'); p.appendChild(n);
+    b(L('Voltar', 'Back'), () => { p.style.display = 'none'; }); };
+  const bo = UI.buildOptions; UI.buildOptions = function () { const r = bo.apply(this, arguments); if ((this.optPage || 'main') === 'main') { const box = document.getElementById('optlist'); const x = document.createElement('button'); x.className = 'btn'; x.textContent = L('Local dos mundos...', 'World save location...'); x.onclick = () => { Snd.play('click'); open(); }; box.appendChild(x); } return r; };
+  window.openWorldLocation = open;
 })();
 
 // ===== REGRA GLOBAL DE TOQUE: nada fica "preso" selecionado/apertado, e nada de azul de navegador =====
