@@ -327,7 +327,7 @@ class Simplex {
 const IS_TOUCH = (window.matchMedia && matchMedia('(pointer: coarse)').matches) || ('ontouchstart' in window);
 const DEFAULT_KEYS = { fwd: 'KeyW', back: 'KeyS', left: 'KeyA', right: 'KeyD', jump: 'Space', sneak: 'ShiftLeft', sprint: 'ControlLeft', inv: 'KeyE', drop: 'KeyQ', chat: 'KeyT', cmd: 'Slash', cam: 'F5', hud: 'F1', debug: 'F3', special: 'KeyF' };
 const DEFAULT_SETTINGS = {
-  touchStyle: 'dpad', touchAim: 'tap', touchSize: 100, lang: ((navigator.language || 'pt').toLowerCase().startsWith('pt') ? 'pt' : 'en'),
+  touchStyle: 'joystick', touchAim: 'tap', touchSize: 100, lang: ((navigator.language || 'pt').toLowerCase().startsWith('pt') ? 'pt' : 'en'),
   fov: 75, renderDist: IS_TOUCH ? 3 : 5, sens: 100, volume: 80, music: 40, brightness: 50,
   clouds: true, bobbing: true, showFps: false, autoJump: IS_TOUCH, touch: 'auto', invertY: false,
   particles: true, fancyLeaves: true, guiScale: 100, resolution: IS_TOUCH ? 75 : 100, difficulty: 2
@@ -8181,6 +8181,51 @@ MOB_CLASS.villager = function (x, y, z) { return new Villager(x, y, z, Math.floo
 })();
 // dica de nome do item e item preso no cursor ficam sempre por cima de tudo (inclusive da barra de rolagem)
 (function () { for (const id of ['tip', 'cursor']) { const el = document.getElementById(id); if (el && el.parentNode !== document.body) document.body.appendChild(el); } })();
+
+// ===== Toque: joystick como padrão, "Tocar na tela" sem botões de ação e círculo de toque =====
+(function () {
+  // quem já jogava recebe o novo padrão uma vez (depois pode trocar nas opções)
+  if (S.ctrlV !== 2) { S.ctrlV = 2; S.touchStyle = 'joystick'; S.touchAim = 'tap'; saveSettings(); try { G.applySettings('touchStyle'); } catch (e) { } }
+
+  const st = document.createElement('style');
+  st.textContent = `
+body.touch:not(.taim-cross) #bAtk, body.touch:not(.taim-cross) #bUse{display:none}
+#tcircle{position:fixed;left:0;top:0;width:76px;height:76px;margin:-38px 0 0 -38px;border-radius:50%;pointer-events:none;z-index:12;display:none;
+  background:conic-gradient(rgba(255,255,255,.85) calc(var(--p,0) * 360deg), rgba(255,255,255,.18) 0);
+  -webkit-mask:radial-gradient(circle, transparent 27px, #000 28px, #000 36px, transparent 37px);mask:radial-gradient(circle, transparent 27px, #000 28px, #000 36px, transparent 37px);
+  filter:drop-shadow(0 0 2px rgba(0,0,0,.6))}
+#tcircle.on{display:block}
+#tcircle::after{content:'';position:absolute;left:50%;top:50%;width:8px;height:8px;margin:-4px 0 0 -4px;border-radius:50%;background:rgba(255,255,255,.7)}`;
+  document.head.appendChild(st);
+  const ring = document.createElement('div'); ring.id = 'tcircle'; document.body.appendChild(ring);
+
+  const tapMode = () => document.body.classList.contains('touch') && S.touchAim !== 'crosshair';
+  // ponto do dedo na tela: é ali que o jogador mira (quebra, coloca, ataca)
+  const aim = { id: undefined, x: 0, y: 0, moved: false, keep: 0 };
+  const cv = G.renderer.domElement;
+  cv.addEventListener('touchstart', e => { if (G.state !== 'play' || UI.open || aim.id !== undefined) return; const t = e.changedTouches[0]; aim.id = t.identifier; aim.x = aim.sx = t.clientX; aim.y = aim.sy = t.clientY; aim.moved = false; aim.keep = 0; }, { passive: true });
+  cv.addEventListener('touchmove', e => { for (const t of e.changedTouches) { if (t.identifier !== aim.id) continue; aim.x = t.clientX; aim.y = t.clientY; if (Math.hypot(aim.x - aim.sx, aim.y - aim.sy) > 12) aim.moved = true; } }, { passive: true });
+  const end = e => { for (const t of e.changedTouches) if (t.identifier === aim.id) { aim.id = undefined; aim.keep = performance.now() + 250; } };
+  cv.addEventListener('touchend', end, { passive: true }); cv.addEventListener('touchcancel', end, { passive: true });
+
+  // usa o ponto do dedo enquanto ele está parado/segurando (e um instante depois de um toque rápido)
+  const aimDir = () => { if (!tapMode() || G.camMode !== 0) return null;
+    const active = aim.id !== undefined ? (!aim.moved || G.touchHold) : performance.now() < aim.keep; if (!active) return null;
+    const v = new THREE.Vector3((aim.x / innerWidth) * 2 - 1, -(aim.y / innerHeight) * 2 + 1, 0.5).unproject(G.camera); return v.sub(G.camera.position).normalize(); };
+  G.touchAimDir = aimDir;
+  const it = G.interact; G.interact = function () { const d = aimDir(); if (!d) return it.apply(this, arguments);
+    const ld = this.lookDir; this.lookDir = () => d.clone(); try { return it.apply(this, arguments); } finally { this.lookDir = ld; } };
+  // colocar/usar também segue o dedo
+  for (const fn of ['use', 'attack']) if (typeof G[fn] === 'function') { const o = G[fn]; G[fn] = function () { const d = aimDir(); if (!d) return o.apply(this, arguments); const ld = this.lookDir; this.lookDir = () => d.clone(); try { return o.apply(this, arguments); } finally { this.lookDir = ld; } }; }
+
+  // círculo de toque: aparece só quando você segura o dedo para quebrar/atacar, e enche conforme o bloco quebra
+  const loop = () => { requestAnimationFrame(loop);
+    const show = tapMode() && G.state === 'play' && !UI.open && G.touchHold && aim.id !== undefined;
+    if (!show) { if (ring.classList.contains('on')) ring.classList.remove('on'); return; }
+    ring.classList.add('on'); ring.style.left = aim.x + 'px'; ring.style.top = aim.y + 'px';
+    const b = G.breaking; ring.style.setProperty('--p', b && G.player.mode !== 'creative' ? Math.min(1, b.prog).toFixed(3) : 0); };
+  loop();
+})();
 </script>
 </body>
 </html>
