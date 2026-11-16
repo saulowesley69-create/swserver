@@ -1508,7 +1508,9 @@ function chestItemGeo(size = 1) {
   return bufToGeo(A);
 }
 // bloco segurado na mão: modelo 3D de verdade (cubo, laje, escada, cerca, portão, muro, baú)
-function heldBlockGeo(bid, size) { return BL[bid].boxes === 'chest' ? chestItemGeo(size) : blockCubeGeo(bid, size); }
+function heldBlockGeo(bid, size, st) { return BL[bid].boxes === 'chest' ? chestItemGeo(size) : blockCubeGeo(bid, size, st && window.GLASS_TINT ? GLASS_TINT[st - 1] : null); }
+// material certo para o item na mão/no chão (vidro colorido é meio transparente)
+function heldMat(it) { return it && it.st && G.matGlass ? G.matGlass : G.matSolid; }
 function isHeld3D(bid) { const b = BL[bid]; return !!b && !b.cross && !b.torch && !b.flat && !b.crop && b.shape !== 'door' && b.shape !== 'bed' && (!b.shape || !!b.boxes); }
 
 // ================= MUDA (sapling): planta e vira árvore =================
@@ -2323,13 +2325,13 @@ function meshChunk(world, ch) {
   return { solid: bufToGeo(S_), water: bufToGeo(W_), glass: bufToGeo(G_) };
 }
 // cubo de bloco individual (mão, itens no chão, TNT)
-function blockCubeGeo(id, size = 1) {
+function blockCubeGeo(id, size = 1, tint = null) {
   const b = BL[id]; const A = newBuf(); const h = size / 2;
-  if (b.boxes) { emitBoxes(A, blockBoxes(id, 0, -999, 0, false, { bdata: {}, getBlock: (X, Y, Z) => Z === 0 && X !== 0 ? BID.stone : 0 }), -h, -h, -h, b.tex, 1, 0, null, size); return bufToGeo(A); }
+  if (b.boxes) { emitBoxes(A, blockBoxes(id, 0, -999, 0, false, { bdata: {}, getBlock: (X, Y, Z) => Z === 0 && X !== 0 ? BID.stone : 0 }), -h, -h, -h, b.tex, 1, 0, null, size, false, tint); return bufToGeo(A); }
   if (b.cross || b.torch) {
     const t = b.tex.side; const q = [[-h, -h, 0], [-h, h, 0], [h, h, 0], [h, -h, 0]];
-    for (const rev of [false, true]) { const qq = rev ? [q[3], q[2], q[1], q[0]] : q; const uu = rev ? [FUV[3], FUV[2], FUV[1], FUV[0]] : FUV; pushQuad(A, qq, uu.map(u => tileUV(t, u[0], u[1])), [1, 1, 1, 1], 1, 0, false); }
-  } else for (let f = 0; f < 6; f++) { const F = FACES[f]; const t = F.t === 'top' ? b.tex.top : F.t === 'bottom' ? b.tex.bottom : (f === 5 && b.facing ? b.tex.front : b.tex.side); pushQuad(A, F.c.map(c => [c[0] * size - h, c[1] * size - h, c[2] * size - h]), FUV.map(u => tileUV(t, u[0], u[1])), [F.s, F.s, F.s, F.s], 1, 0, false); }
+    for (const rev of [false, true]) { const qq = rev ? [q[3], q[2], q[1], q[0]] : q; const uu = rev ? [FUV[3], FUV[2], FUV[1], FUV[0]] : FUV; pushQuad(A, qq, uu.map(u => tileUV(t, u[0], u[1])), [1, 1, 1, 1], 1, 0, false, tint); }
+  } else for (let f = 0; f < 6; f++) { const F = FACES[f]; const t = F.t === 'top' ? b.tex.top : F.t === 'bottom' ? b.tex.bottom : (f === 5 && b.facing ? b.tex.front : b.tex.side); pushQuad(A, F.c.map(c => [c[0] * size - h, c[1] * size - h, c[2] * size - h]), FUV.map(u => tileUV(t, u[0], u[1])), [F.s, F.s, F.s, F.s], 1, 0, false, tint); }
   return bufToGeo(A);
 }
 
@@ -2849,7 +2851,7 @@ const _cubeGeo = {};
 function makeItemMesh(id, size) {
   const it = IT[id];
   if (it.block && BL[it.block].shape === 'bed') { const k = 'bed_' + size; const g = _cubeGeo[k] || (_cubeGeo[k] = bedModelGeo(size)); return new THREE.Mesh(g, G.matSolid); }
-  if (it.block && isHeld3D(it.block)) { const k = id + '_' + size; const g = _cubeGeo[k] || (_cubeGeo[k] = heldBlockGeo(it.block, size)); return new THREE.Mesh(g, G.matSolid); }
+  if (it.block && isHeld3D(it.block)) { const k = id + '_' + size; const g = _cubeGeo[k] || (_cubeGeo[k] = heldBlockGeo(it.block, size, it.st)); return new THREE.Mesh(g, heldMat(it)); }
   const m = new THREE.Sprite(new THREE.SpriteMaterial({ map: itemTexture(id), alphaTest: 0.5 })); m.scale.set(size * 1.6, size * 1.6, 1); return m;
 }
 function makeFlatItemMesh(id, size) { // plano 3D para a mão
@@ -4865,7 +4867,7 @@ const G = {
     mkPart(m, h, 1.4, 1.2, 0.6, SK2, 0, 2.8, -4.1); mkPart(m, h, 3, 0.8, 0.45, [150, 90, 80], 0, 1.4, -4.1);
     if (!AH) { mkPart(m, h, 8.6, 1.1, 8.6, ACC, 0, 5.9, 0); mkPart(m, h, 1.4, 2.6, 0.6, ACC, 3, 5, 4.4); } mkPart(m, m.root, 8.6, 1.8, 4.6, ACC, 0, 23.4, 0); mkPart(m, m.root, 2, 4, 0.6, shade(ACC, 0.85), -2.2, 21, -2.5); mkPart(m, m.root, 1, 10, 0.5, shade(SH, 0.8), 0, 18, -2.15);
     if (AH) { mkPart(m, h, 9, 3.6, 9, AH, 0, 6.6, 0); mkPart(m, h, 9, 5.5, 1, AH, 0, 3, 4.1); mkPart(m, h, 1, 5.5, 8, AH, -4.1, 3, 0.5); mkPart(m, h, 1, 5.5, 8, AH, 4.1, 3, 0.5); mkPart(m, h, 9.2, 1.2, 1, shade(AH, 0.7), 0, 5, -4.2); mkPart(m, h, 1.2, 3, 0.8, shade(AH, 0.85), 0, 3, -4.3); }
-    const hs = p && p.held; if (hs) { const it = IT[hs.id]; let hm; if (it.block && BL[it.block].shape === 'bed') { hm = new THREE.Mesh(bedModelGeo(0.3), this.matSolid); hm.position.set(0, -0.72, -0.18); } else if (it.block && isHeld3D(it.block)) { hm = new THREE.Mesh(heldBlockGeo(it.block, 0.32), this.matSolid); hm.position.set(0, -0.72, -0.18); } else { hm = makeFlatItemMesh(hs.id, 0.75); hm.rotation.set(0, Math.PI / 2, 0); hm.rotation.z = it.tool ? -0.9 : 0; hm.position.set(0, -0.62, -0.38); } m.arms[1].add(hm); m.heldMesh = hm; if (it.tool === 'rod') { hm.rotation.set(0, Math.PI / 2, -0.25); hm.position.set(0, -0.7, -0.45); } }
+    const hs = p && p.held; if (hs) { const it = IT[hs.id]; let hm; if (it.block && BL[it.block].shape === 'bed') { hm = new THREE.Mesh(bedModelGeo(0.3), this.matSolid); hm.position.set(0, -0.72, -0.18); } else if (it.block && isHeld3D(it.block)) { hm = new THREE.Mesh(heldBlockGeo(it.block, 0.32, it.st), heldMat(it)); hm.position.set(0, -0.72, -0.18); } else { hm = makeFlatItemMesh(hs.id, 0.75); hm.rotation.set(0, Math.PI / 2, 0); hm.rotation.z = it.tool ? -0.9 : 0; hm.position.set(0, -0.62, -0.38); } m.arms[1].add(hm); m.heldMesh = hm; if (it.tool === 'rod') { hm.rotation.set(0, Math.PI / 2, -0.25); hm.position.set(0, -0.7, -0.45); } }
     if (p && p.armor[1] && IT[p.armor[1].id].wings) { m.pwings = []; for (const s of [-1, 1]) { const wg = mkPart(m, m.root, 1, 1, 1, [80, 64, 96], s * 1.4, 23, 2.5); const a = mkPart(m, wg, 9, 20, 0.8, [134, 112, 150], 0, 0, 0, s * 4.5, -9, 0); mkPart(m, a, 8.2, 3, 0.9, [176, 156, 194], s * 4.5, -1.5, 0); mkPart(m, a, 1.2, 20, 1, [80, 64, 96], s * 8.6, -9, 0); wg.userData.s = s; m.pwings.push(wg); } }
     this.pmodel = m; this.pmesh.add(m.root);
   },
@@ -5042,7 +5044,7 @@ const G = {
       let m;
       if (!id) { m = new THREE.Mesh(new THREE.BoxGeometry(0.16, 0.16, 0.6), new THREE.MeshLambertMaterial({ color: 0xcd9673 })); m.position.set(0.18, -0.1, 0.05); m.rotation.set(0.35, 0.25, 0); }
       else if (IT[id].block && BL[IT[id].block].shape === 'bed') { m = new THREE.Mesh(bedModelGeo(0.17), this.matSolid); m.rotation.set(0.15, Math.PI / 4 + 0.9, 0); m.position.set(-0.02, 0.06, 0.05); }
-      else if (IT[id].block && isHeld3D(IT[id].block)) { m = new THREE.Mesh(heldBlockGeo(IT[id].block, 0.42), this.matSolid); m.rotation.set(0, Math.PI / 4, 0); }
+      else if (IT[id].block && isHeld3D(IT[id].block)) { m = new THREE.Mesh(heldBlockGeo(IT[id].block, 0.42, IT[id].st), heldMat(IT[id])); m.rotation.set(0, Math.PI / 4, 0); }
       else { m = makeFlatItemMesh(id, 0.75); m.rotation.set(0, -Math.PI / 2.6, Math.PI / 12); m.position.set(0.05, 0.12, 0); }
       this.hand.add(m); this.handBase = m; this.bowStage = -1; this.handLT = 0;
     }
@@ -6380,7 +6382,7 @@ Player.prototype.update = function (dt, inp) {
     if (cur > 2 && this.handBase) { const hb = this.handBase, k = Math.min(1, cur / 14); const al = hb.geometry && hb.geometry.getAttribute && hb.geometry.getAttribute('aLight'); if (al) { for (let i = 0; i < al.count; i++) al.setY(i, Math.max(al.getY(i), k)); al.needsUpdate = true; } else if (hb.material && hb.material.color && !(p.held && p.held.e)) { const c = hb.material.color; const v = Math.max(c.r, k); if (!p.held) c.setHex(0xcd9673).multiplyScalar(Math.max(v, 0.9)); else c.setRGB(Math.max(c.r, k), Math.max(c.g, k), Math.max(c.b, k)); } }
     // item comum na segunda mão (ex.: tocha na esquerda)
     const o = p.off && p.off[0], oid = o && !IT[o.id].shield ? o.id : 0;
-    if (oid !== this.offId) { this.offId = oid; if (this.offMesh) { this.handScene.remove(this.offMesh); this.offMesh = null; } if (oid) { const it = IT[oid]; let m; if (it.block && isHeld3D(it.block)) { m = new THREE.Mesh(heldBlockGeo(it.block, 0.36), this.matSolid); m.rotation.set(0, -Math.PI / 4, 0); } else { m = makeFlatItemMesh(oid, 0.62); m.rotation.set(0, Math.PI / 2.6, -Math.PI / 12); m.scale.x = -1; } this.offMesh = m; this.handScene.add(m); } }
+    if (oid !== this.offId) { this.offId = oid; if (this.offMesh) { this.handScene.remove(this.offMesh); this.offMesh = null; } if (oid) { const it = IT[oid]; let m; if (it.block && isHeld3D(it.block)) { m = new THREE.Mesh(heldBlockGeo(it.block, 0.36, it.st), heldMat(it)); m.rotation.set(0, -Math.PI / 4, 0); } else { m = makeFlatItemMesh(oid, 0.62); m.rotation.set(0, Math.PI / 2.6, -Math.PI / 12); m.scale.x = -1; } this.offMesh = m; this.handScene.add(m); } }
     if (this.offMesh) { this.offMesh.visible = this.camMode === 0; const bob = Math.abs(Math.sin(p.walkDist * Math.PI * 0.55)) * 0.03 * Math.min(1, Math.hypot(p.vel.x, p.vel.z) / 4.3); this.offMesh.position.set(-0.52, -0.4 + bob, -0.85); if (this.offMesh.material && this.offMesh.material.color && cur > 2) this.offMesh.material.color.setRGB(1, 1, 1); else if (this.offMesh.material && this.offMesh.material.color && this.world) { const L = clamp(this.world.lightAt(p.pos.x, p.pos.y + 1.6, p.pos.z), 0.08, 1); this.offMesh.material.color.setRGB(L, L, L); } }
     return r;
   };
@@ -8378,6 +8380,59 @@ body.touch #actbtn.show{display:block}`;
 // o jogo já abriu o menu antes deste arquivo carregar: troca o mundo de fundo pela "foto 3D" logo de cara
 (function () { if (window.VM_ASSETS && G.state === 'title' && G.world && G.pano && !G.pano.fail) G.toTitle(); })();
 
+// ================= INVENTÁRIO CRIATIVO: GRUPOS QUE EXPANDEM (como no Bedrock) =================
+// Itens com muitas variações (escadas, lajes, cercas, vidros, painéis, lãs...) ficam num slot só.
+// Tocar no grupo abre as variações logo em seguida; tocar de novo fecha. Na pesquisa não agrupa.
+(function () {
+  const en = () => S.lang === 'en';
+  const FLOWERS = new Set(['dandelion', 'poppy', 'cornflower', 'allium', 'orange_tulip', 'oxeye_daisy', 'pink_petals', 'sunflower']);
+  const GROUPS = [
+    ['stairs', 'Escadas', 'Stairs', k => /(^|_)stairs$/.test(k)], ['slab', 'Lajes', 'Slabs', k => /(^|_)slab$/.test(k)],
+    ['fence_gate', 'Portões', 'Fence Gates', k => /fence_gate$/.test(k)], ['fence', 'Cercas', 'Fences', k => /fence$/.test(k)],
+    ['wall', 'Muros', 'Walls', k => /(^|_)wall$/.test(k)], ['trapdoor', 'Alçapões', 'Trapdoors', k => /trapdoor$/.test(k)],
+    ['door', 'Portas', 'Doors', k => /door$/.test(k) && !/trapdoor/.test(k)], ['planks', 'Tábuas', 'Planks', k => /planks$/.test(k)],
+    ['log', 'Troncos', 'Logs', k => /(^log$|_log$|_stem$)/.test(k) && k !== 'mushroom_stem'], ['leaves', 'Folhas', 'Leaves', k => /leaves$/.test(k)],
+    ['sapling', 'Mudas', 'Saplings', k => /sapling$/.test(k)], ['glass_pane', 'Painéis de Vidro', 'Glass Panes', k => /glass_pane$/.test(k)],
+    ['glass', 'Vidros', 'Glass', k => k === 'glass' || /_stained_glass$/.test(k)], ['wool', 'Lãs', 'Wool', k => /^wool_/.test(k)],
+    ['carpet', 'Tapetes', 'Carpets', k => /carpet/.test(k)], ['terracotta', 'Terracotas', 'Terracotta', k => /terracotta/.test(k)],
+    ['flower', 'Flores', 'Flowers', k => FLOWERS.has(k)], ['ore', 'Minérios', 'Ores', k => /_ore$/.test(k)],
+    ['plate', 'Placas de Pressão', 'Pressure Plates', k => /pressure_plate|_plate$/.test(k) && !/chestplate/.test(k)], ['button', 'Botões', 'Buttons', k => /button$/.test(k)],
+    ['bed', 'Camas', 'Beds', k => /(^bed$|_bed$)/.test(k)], ['boat', 'Barcos', 'Boats', k => /boat$/.test(k)],
+    ['helmet', 'Capacetes', 'Helmets', k => /_helmet$/.test(k)], ['chest', 'Peitorais', 'Chestplates', k => /_(chest|chestplate)$/.test(k)],
+    ['legs', 'Calças', 'Leggings', k => /_(legs|leggings)$/.test(k)], ['boots', 'Botas', 'Boots', k => /_boots$/.test(k)],
+    ['sword', 'Espadas', 'Swords', k => /_sword$/.test(k)], ['pickaxe', 'Picaretas', 'Pickaxes', k => /_pickaxe$/.test(k)],
+    ['axe', 'Machados', 'Axes', k => /_axe$/.test(k) && !/pickaxe/.test(k)], ['shovel', 'Pás', 'Shovels', k => /_shovel$/.test(k)],
+    ['hoe', 'Enxadas', 'Hoes', k => /_hoe$/.test(k)], ['spear', 'Lanças', 'Spears', k => /_spear$/.test(k)]];
+  const groupOf = it => { if (!it || !it.key) return null; for (const g of GROUPS) if (g[3](it.key)) return g; return null; };
+  window.CREATIVE_GROUP_OF = groupOf;
+  const st = document.createElement('style'); st.textContent = `
+.slot.cgroup{position:relative;cursor:pointer;background:#8b8b8b}
+.slot.cgroup::after{content:'';position:absolute;right:3px;bottom:3px;width:0;height:0;border-left:7px solid transparent;border-bottom:7px solid #fff;filter:drop-shadow(1px 1px 0 #000)}
+.slot.cgroup.open{background:#b9c7da}.slot.cgroup.open::after{border-bottom-color:#ffeb7a}
+.slot.cgm{background:#a9b6c8!important}
+.slot.cgroup .cgn{position:absolute;left:2px;top:1px;font-size:13px;color:#fff;text-shadow:1px 1px #000;pointer-events:none}`;
+  document.head.appendChild(st);
+  UI.cgOpen = UI.cgOpen || {};
+  const fc = UI.fillCreative; UI.fillCreative = function (grid) {
+    const r = fc.apply(this, arguments);
+    if (this.creativeTab === 'search' || this.creativeTab === 'ench') return r;
+    const refs = this.slots.filter(s => s.type === 'creative'), els = [...grid.querySelectorAll('.slot')].filter(e => !e.classList.contains('cempty'));
+    // slot -> item
+    const pairs = els.map(el => { const ref = this.slots[+el.dataset.si]; return { el, it: ref ? IT[ref.id] : null }; });
+    const byG = new Map(); for (const p of pairs) { const g = groupOf(p.it); if (!g) continue; if (!byG.has(g[0])) byG.set(g[0], { g, list: [] }); byG.get(g[0]).list.push(p); }
+    const empties = [...grid.querySelectorAll('.slot.cempty')]; empties.forEach(e => e.remove());
+    for (const { g, list } of byG.values()) { if (list.length < 2) continue;
+      const head = document.createElement('div'); head.className = 'slot cgroup' + (UI.cgOpen[g[0]] ? ' open' : ''); head.title = (en() ? g[2] : g[1]) + ' (' + list.length + ')';
+      const src = list[0].it && list[0].it.canvas; if (src) { const cv = document.createElement('canvas'); cv.width = src.width; cv.height = src.height; cv.getContext('2d').drawImage(src, 0, 0); head.appendChild(cv); } const n = document.createElement('span'); n.className = 'cgn'; n.textContent = list.length; head.appendChild(n);
+      list[0].el.before(head); let after = head;
+      for (const p of list) { p.el.classList.add('cgm'); p.el.style.display = UI.cgOpen[g[0]] ? '' : 'none'; after.after(p.el); after = p.el; }
+      head.addEventListener('click', e => { e.stopPropagation(); Snd.play('click'); UI.cgOpen[g[0]] = !UI.cgOpen[g[0]]; head.classList.toggle('open', !!UI.cgOpen[g[0]]); for (const p of list) p.el.style.display = UI.cgOpen[g[0]] ? '' : 'none'; refill(); }); }
+    // completa a grade de novo
+    const refill = () => { grid.querySelectorAll('.slot.cempty').forEach(e => e.remove()); const vis = [...grid.children].filter(e => e.style.display !== 'none').length, fill = Math.max(54, Math.ceil(vis / 9) * 9) - vis; for (let i = 0; i < fill; i++) { const e = document.createElement('div'); e.className = 'slot cempty'; grid.appendChild(e); } };
+    refill(); return r;
+  };
+})();
+
 // ================= CHAT E COMANDOS (tela própria): barra de cima, histórico, sugestões, lista de comandos prontos =================
 // O teclado do celular/tablet não mexe no jogo: só a barra de digitar sobe junto com o teclado.
 (function () {
@@ -8513,6 +8568,34 @@ body.chopen #touchui,body.chopen #chatlog,body.chopen #itemname,body.chopen #hot
   const rs = G.resize; G.resize = function () { if (typing() && innerWidth === baseW && innerHeight < baseH) return; baseW = innerWidth; baseH = innerHeight; return rs.apply(this, arguments); };
   addEventListener('scroll', () => { if (scrollX || scrollY) scrollTo(0, 0); });
   document.addEventListener('focusout', () => setTimeout(() => { if (!typing() && (innerHeight !== baseH || innerWidth !== baseW)) G.resize(); }, 300));
+})();
+
+// ================= ENTITY CULLING: criatura escondida atrás de blocos (ou longe demais) não é desenhada =================
+// Ela continua viva e andando; só não gasta desenho. Cada criatura é conferida umas 5 vezes por segundo, em rodízio.
+(function () {
+  const v = new THREE.Vector3();
+  // anda bloco a bloco do olho até o ponto; true se bater num bloco que tapa a visão
+  function blocked(w, ax, ay, az, bx, by, bz) {
+    const dx = bx - ax, dy = by - ay, dz = bz - az, L = Math.hypot(dx, dy, dz), n = Math.min(200, Math.ceil(L / 0.45)); let lk = '';
+    const ex = Math.floor(bx), ey = Math.floor(by), ez = Math.floor(bz);
+    for (let i = 1; i < n; i++) { const f = i / n, x = Math.floor(ax + dx * f), y = Math.floor(ay + dy * f), z = Math.floor(az + dz * f); if (x === ex && y === ey && z === ez) return false; const k = x + ',' + y + ',' + z; if (k === lk) continue; lk = k; if (OPAQ[w.getBlock(x, y, z)]) return true; }
+    return false; }
+  window.losBlocked = blocked;
+  let rr = 0; G.cullStats = { hidden: 0, total: 0 };
+  const tk = G.tick; G.tick = function (dt) {
+    const r = tk.apply(this, arguments);
+    if (this.state !== 'play' || !this.world || !this.camera) return r;
+    const w = this.world, cam = this.camera.getWorldPosition(v), ex = cam.x, ey = cam.y, ez = cam.z, far = (S.renderDist || 8) * 16 + 8, list = this.entities, n = list.length;
+    if (!n) return r; const per = Math.max(4, Math.ceil(n / 12)); let hid = 0;
+    for (let k = 0; k < n; k++) { const e = list[k]; if (!e.mesh || e.dead) continue;
+      const big = (e.w || 0) > 1.6 || e.type === 'dragon' || e.type === 'crystal'; const d = Math.hypot(e.pos.x - ex, e.pos.y - ey, e.pos.z - ez);
+      let vis = e._cullVis !== false;
+      if (d > far) vis = false;
+      else if (big || d < 6 || S.cull === false) vis = true;
+      else if ((k + rr) % per === 0 || e._cullVis === undefined) { const h = e.h || 1; vis = !(blocked(w, ex, ey, ez, e.pos.x, e.pos.y + h * 0.5, e.pos.z) && blocked(w, ex, ey, ez, e.pos.x, e.pos.y + h + 0.05, e.pos.z)); }
+      e._cullVis = vis; if (e.mesh.visible !== vis) e.mesh.visible = vis; if (!vis) hid++; }
+    rr++; G.cullStats.hidden = hid; G.cullStats.total = n; return r;
+  };
 })();
 
 // ===== FORNALHA: chama de verdade (desenho de pixel) que vai apagando, seta que enche e casas maiores =====
