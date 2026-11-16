@@ -1698,7 +1698,7 @@ window.TREES = (function () {
   }
   // linha de tronco (galho) de a até b
   function branch(t, x0, y0, z0, x1, y1, z1, log) {
-    const n = Math.max(Math.abs(x1 - x0), Math.abs(y1 - y0), Math.abs(z1 - z0)); for (let i = 1; i <= n; i++) { const f = i / n; t.log(Math.round(x0 + (x1 - x0) * f), Math.round(y0 + (y1 - y0) * f), Math.round(z0 + (z1 - z0) * f), log); }
+    const ax = Math.abs(x1 - x0), az = Math.abs(z1 - z0), ay = Math.abs(y1 - y0), n = Math.max(ax, ay, az), axis = Math.max(ax, az) > ay ? (ax >= az ? 1 : 2) : 0; for (let i = 1; i <= n; i++) { const f = i / n; t.log(Math.round(x0 + (x1 - x0) * f), Math.round(y0 + (y1 - y0) * f), Math.round(z0 + (z1 - z0) * f), log, axis); }
   }
   const T = {
     // carvalho comum
@@ -1825,6 +1825,7 @@ class World {
     if (w < -0.08) return BIOME.PLAINS; if (w < 0.12 || sf < 0.3) return BIOME.BIRCH; return BIOME.SWAMP;
   }
   generate(c) {
+    c.ax = null;
     if (this.dim === 'nether') return this.genNether(c);
     if (this.dim === 'end') return this.genEnd(c);
     const d = c.data, bx = c.cx * CS, bz = c.cz * CS, seed = this.seed;
@@ -1928,7 +1929,7 @@ class World {
       if (red) { for (let dx = -2; dx <= 2; dx++) for (let dz = -2; dz <= 2; dz++) { if (Math.abs(dx) === 2 && Math.abs(dz) === 2) continue; leafAt(x + dx, ty, z + dz, C); if (Math.abs(dx) === 2 || Math.abs(dz) === 2) for (let k = 1; k <= 2; k++) leafAt(x + dx, ty - k, z + dz, C); } }
       else for (let dx = -3; dx <= 3; dx++) for (let dz = -3; dz <= 3; dz++) { if (Math.abs(dx) === 3 && Math.abs(dz) === 3) continue; leafAt(x + dx, ty, z + dz, C); } };
     const spike = (x, y, z) => { const P = B_('packed_ice'), hgt = 6 + (r() * 10 | 0), big = hgt > 11; for (let i = -1; i < hgt; i++) { const f = i / hgt, rad = big ? (f < 0.3 ? 1.6 : f < 0.65 ? 1.1 : 0.4) : (f < 0.4 ? 1.0 : 0.3); for (let dx = -2; dx <= 2; dx++) for (let dz = -2; dz <= 2; dz++) if (dx * dx + dz * dz <= rad * rad + 0.3) set(x + dx, y + i, z + dz, P); } };
-    const G6 = this.gen >= 6, TA = { get, log: set, leaf: leafAt, r }, mega = (x, z) => x >= 5 && x <= 9 && z >= 5 && z <= 9;
+    const G6 = this.gen >= 6, TA = { get, log: (x, y, z, id, ax) => { set(x, y, z, id); if (ax && x >= 0 && x < 16 && z >= 0 && z < 16 && y >= 0 && y < WH) (c.ax || (c.ax = new Map())).set((y * 16 + z) * 16 + x, ax); }, leaf: leafAt, r }, mega = (x, z) => x >= 5 && x <= 9 && z >= 5 && z <= 9;
     const FLOWERS = [B_('dandelion'), B_('poppy'), B_('cornflower'), B_('allium'), B_('orange_tulip'), B_('oxeye_daisy')];
     const SANDS = new Set([B_('sand'), B_('red_sand')]), GROUND = new Set([B_('grass'), B_('snow_grass'), B_('dirt'), B_('mycelium'), B_('snow')]);
     for (let z = 0; z < 16; z++) for (let x = 0; x < 16; x++) {
@@ -1963,7 +1964,7 @@ class World {
     c.bio = BI;
     this.genStructures(c);
     // modificações salvas
-    const m = this.mods[ckey(c.cx, c.cz)]; if (m) for (const i in m) d[i] = m[i];
+    const m = this.mods[ckey(c.cx, c.cz)]; if (m) applyMods(c, m);
     this.finishLoot(c);
     c.computeTop(); c.computeLights(); c.genDone = true; c.dirty = true;
   }
@@ -2002,7 +2003,7 @@ class World {
         break;
       }
     }
-    const m = this.mods[ckey(c.cx, c.cz)]; if (m) for (const i in m) d[i] = m[i];
+    const m = this.mods[ckey(c.cx, c.cz)]; if (m) applyMods(c, m);
     c.computeTop(); c.computeLights(); c.genDone = true; c.dirty = true;
   }
   genEnd(c) {
@@ -2016,11 +2017,12 @@ class World {
       if (dd < 4.6) { for (let y = 50; y < 55; y++) set(x, y, z, ES); set(x, 55, z, BR); for (let y = 56; y < 62; y++) set(x, y, z, 0); if (dd >= 2.5) set(x, 56, z, dd < 3.6 ? B_('rune_stone') : B_('end_bricks')); }
     }
     this.genEndExtra(c);
-    const m = this.mods[ckey(c.cx, c.cz)]; if (m) for (const i in m) d[i] = m[i];
+    const m = this.mods[ckey(c.cx, c.cz)]; if (m) applyMods(c, m);
     this.finishLoot(c);
     c.computeTop(); c.computeLights(); c.genDone = true; c.dirty = true;
   }
   getChunk(cx, cz) { return this.chunks.get(ckey(cx, cz)); }
+  getAxis(x, y, z) { const c = this.chunks.get(ckey(x >> 4, z >> 4)); return c && c.ax ? (c.ax.get((y * 16 + (z & 15)) * 16 + (x & 15)) || 0) : 0; }
   getBlock(x, y, z) { if (y < 0) return 0; if (y >= WH) return 0; const c = this.chunks.get(ckey(x >> 4, z >> 4)); if (!c) return 0; return c.data[(y * 16 + (z & 15)) * 16 + (x & 15)]; }
   getPhys(x, y, z) { if (y < 0) return 0; if (y >= WH) return 0; const c = this.chunks.get(ckey(x >> 4, z >> 4)); if (!c) return 3; return c.data[(y * 16 + (z & 15)) * 16 + (x & 15)]; }
   topAt(x, z) { const c = this.chunks.get(ckey(x >> 4, z >> 4)); if (!c) return 0; return c.top[(z & 15) * 16 + (x & 15)]; }
@@ -2028,8 +2030,8 @@ class World {
   markDirty(cx, cz) { const c = this.chunks.get(ckey(cx, cz)); if (c) c.dirty = true; }
   setBlock(x, y, z, id, opts = {}) {
     if (y < 0 || y >= WH) return; const cx = x >> 4, cz = z >> 4; const c = this.chunks.get(ckey(cx, cz)); if (!c) return;
-    const lx = x & 15, lz = z & 15, i = (y * 16 + lz) * 16 + lx; const old = c.data[i]; if (old === id) return;
-    c.data[i] = id; const k = ckey(cx, cz); (this.mods[k] || (this.mods[k] = {}))[i] = id;
+    const lx = x & 15, lz = z & 15, i = (y * 16 + lz) * 16 + lx; const old = c.data[i], oax = c.ax ? (c.ax.get(i) || 0) : 0, ax = AXIAL[id] ? (opts.ax !== undefined ? opts.ax : old === id ? oax : 0) : 0; if (old === id && ax === oax) return;
+    c.data[i] = id; if (ax) (c.ax || (c.ax = new Map())).set(i, ax); else if (oax) c.ax.delete(i); const k = ckey(cx, cz); (this.mods[k] || (this.mods[k] = {}))[i] = id + 256 * ax;
     // topo da coluna
     const ci = lz * 16 + lx;
     if (OPAQ[id] && y > c.top[ci]) c.top[ci] = y;
@@ -2094,6 +2096,9 @@ class World {
 
 // ================= MESHER =================
 function liqH(id, above) { if (LIQT[above] === LIQT[id]) return 1; const l = LVL[id]; if (l === 0 || l === 8) return 0.875; return Math.max(0.12, (8 - l) / 9); }
+// troncos deitados: o mesmo bloco, só guarda o eixo (1 = ao longo de X, 2 = ao longo de Z). Nas mudanças salvas fica id + 256*eixo.
+const AXIAL = new Uint8Array(256); for (const b of BL) if (b && /^(log|.+_log|crimson_stem|warped_stem|hay|basalt|void_pillar)$/.test(b.key)) AXIAL[b.id] = 1;
+function applyMods(c, m) { const d = c.data; for (const i in m) { const v = m[i]; d[i] = v; if (c.ax) c.ax.delete(+i); if (v > 255) (c.ax || (c.ax = new Map())).set(+i, v >> 8); } }
 const FACES = [
   { d: [0, 1, 0], c: [[0, 1, 0], [0, 1, 1], [1, 1, 1], [1, 1, 0]], t: 'top', s: 1.0 },
   { d: [0, -1, 0], c: [[0, 0, 0], [1, 0, 0], [1, 0, 1], [0, 0, 1]], t: 'bottom', s: 0.5 },
@@ -2226,13 +2231,15 @@ function meshChunk(world, ch) {
       continue;
     }
     const A = b.translucent ? W_ : S_;
+    const axv = AXIAL[id] && ch.ax ? (ch.ax.get((y * 16 + z) * 16 + x) || 0) : 0;
     let facing = -1; if (b.facing) { const bd = world.bdata[(ch.cx * 16 + x) + ',' + y + ',' + (ch.cz * 16 + z)]; facing = bd && bd.f !== undefined ? bd.f : 5; }
     for (let f = 0; f < 6; f++) {
       const F = FACES[f]; const nx = x + F.d[0], ny = y + F.d[1], nz = z + F.d[2]; const n = get(nx, ny, nz);
       if (OPAQ[n]) continue;
       if (n === id && (b.translucent || id === B_('glass') || (!fancy && !b.opaque))) continue;
       if (id === ICE && LIQT[n] === 1) continue;
-      let t = F.t === 'top' ? b.tex.top : F.t === 'bottom' ? b.tex.bottom : b.tex.side;
+      let t = F.t === 'top' ? b.tex.top : F.t === 'bottom' ? b.tex.bottom : b.tex.side, rot = false;
+      if (axv) { const end = axv === 1 ? (f === 2 || f === 3) : (f === 4 || f === 5); t = end ? b.tex.top : b.tex.side; rot = !end && (axv === 1 ? f !== 1 : f !== 0); }
       if (f === facing) { t = b.tex.front; if (id === B_('furnace')) { const bd = world.bdata[(ch.cx * 16 + x) + ',' + y + ',' + (ch.cz * 16 + z)]; if (bd && bd.lit) t = T.furnace_lit; } }
       const i0 = cl(nx, ny, nz);
       const ao = [0, 0, 0, 0];
@@ -2240,7 +2247,7 @@ function meshChunk(world, ch) {
         const o = F.ao[k]; const s1 = OPAQ[get(x + o[0][0], y + o[0][1], z + o[0][2])], s2 = OPAQ[get(x + o[1][0], y + o[1][1], z + o[1][2])], cc = OPAQ[get(x + o[2][0], y + o[2][1], z + o[2][2])];
         ao[k] = (s1 && s2) ? 0 : 3 - (s1 + s2 + cc);
         { let ss = LCS[i0], bb = LCB[i0], n = 1, j; if (!s1) { j = cl(x + o[0][0], y + o[0][1], z + o[0][2]); ss += LCS[j]; bb += LCB[j]; n++; } if (!s2) { j = cl(x + o[1][0], y + o[1][1], z + o[1][2]); ss += LCS[j]; bb += LCB[j]; n++; } if (!cc && !(s1 && s2)) { j = cl(x + o[2][0], y + o[2][1], z + o[2][2]); ss += LCS[j]; bb += LCB[j]; n++; } skv[k] = ss / n; blv[k] = bb / n; }
-        const c = F.c[k]; verts[k] = [x + c[0], y + c[1], z + c[2]]; uvs[k] = tileUV(t, FUV[k][0], FUV[k][1]); cols[k] = F.s * AO_L[ao[k]];
+        const c = F.c[k]; verts[k] = [x + c[0], y + c[1], z + c[2]]; uvs[k] = rot ? tileUV(t, FUV[k][1], 1 - FUV[k][0]) : tileUV(t, FUV[k][0], FUV[k][1]); cols[k] = F.s * AO_L[ao[k]];
       }
       pushQuad(A, verts, uvs, cols, skv, blv, ao[0] + ao[2] < ao[1] + ao[3], ch.bio && (b.tint || (id === GRASS_ID && f === 0)) ? BIOME_TINT[ch.bio[z * 16 + x]] : null);
     }
@@ -2563,7 +2570,7 @@ World.prototype.genNether = function (c) {
       if (s.type === 'fortress') { const pp = put; buildFortress(this, s, (x, y, z, id, meta, pil) => { if (pil) { const lx = x - bx, lz = z - bz; if (lx < 0 || lx > 15 || lz < 0 || lz > 15) return; for (let yy = y; yy > 1; yy--) { const i = (yy * 16 + lz) * 16 + lx; if (d[i] !== 0 && d[i] !== LV) break; d[i] = id; } return; } pp(x, y, z, id, meta); }); }
       else buildBastion(this, s, put);
     } }
-  if (m0) for (const i in m0) d[i] = m0[i];
+  if (m0) applyMods(c, m0);
   this.finishLoot(c);
   c.computeTop(); c.computeLights();
 };
@@ -2652,7 +2659,7 @@ function plantOak(w, x, y, z, setFn) {
       for (const [px, pz] of PIL) for (let y = Y + 1; y <= Y + (pvp ? 2 : 3); y++) { put(px, y, pz, pvp ? BID.log : BID.stone_bricks); if (!pvp) put(px, Y + 4, pz, BID.glowstone); }
       if (pvp) for (const [px, pz] of [[5, -10], [-10, 5], [10, 5]]) { put(px, Y + 1, pz, BID.hay); put(px + 1, Y + 1, pz, BID.hay); }
     }
-    const m = this.mods[ckey(c.cx, c.cz)]; if (m) for (const i in m) d[i] = m[i];
+    const m = this.mods[ckey(c.cx, c.cz)]; if (m) applyMods(c, m);
     if (this.finishLoot) this.finishLoot(c);
     c.computeTop(); c.computeLights(); c.genDone = true; c.dirty = true;
   };
@@ -5148,7 +5155,7 @@ const G = {
       if (nb.shape === 'door' && (y + 1 >= WH || w.getBlock(x, y + 1, z))) return;
       let bedDir = null;
       if (nb.shape === 'bed') { const fx = -Math.sin(p.yaw), fz = -Math.cos(p.yaw); bedDir = Math.abs(fx) > Math.abs(fz) ? (fx > 0 ? 0 : 1) : (fz > 0 ? 2 : 3); const D = BED_DIRS[bedDir], hc = w.getBlock(x + D[0], y, z + D[1]); if (hc && !BL[hc].replace) { UI.toast('A cama precisa de 2 blocos livres.'); return; } }
-      w.setBlock(x, y, z, bedDir !== null ? BID.bed_foot : it.block);
+      w.setBlock(x, y, z, bedDir !== null ? BID.bed_foot : it.block, { ax: AXIAL[it.block] && t.n[1] === 0 ? (t.n[0] ? 1 : 2) : 0 });
       if (nb.torch && t.n[1] === 0 && SOLID[t.id] && !BL[t.id].replace) { w.bdata[x + ',' + y + ',' + z] = { tw: [-t.n[0], -t.n[2]] }; w.markDirty(x >> 4, z >> 4); }
       if (nb.shape === 'panel' && t.n[1] === 0) { w.bdata[x + ',' + y + ',' + z] = { f: t.n[0] === -1 ? 0 : t.n[0] === 1 ? 1 : t.n[2] === -1 ? 2 : 3 }; w.markDirty(x >> 4, z >> 4); }
       if (bedDir !== null) { const D = BED_DIRS[bedDir]; w.bdata[x + ',' + y + ',' + z] = { f: bedDir }; w.setBlock(x + D[0], y, z + D[1], BID.bed, { noUpdate: true }); w.bdata[(x + D[0]) + ',' + y + ',' + (z + D[1])] = { f: bedDir }; w.markDirty(x >> 4, z >> 4); w.markDirty((x + D[0]) >> 4, (z + D[1]) >> 4); }
@@ -8632,7 +8639,7 @@ input:focus-visible{box-shadow:0 0 0 2px #8f8}`;
   const old = window.growTree;
   const api = w => ({
     get: (x, y, z) => w.getBlock(x, y, z),
-    log: (x, y, z, id) => { const c = w.getBlock(x, y, z); if (!c || BL[c].replace || SAPLINGS[c] !== undefined || /leaves/.test(BL[c].key) || !SOLID[c]) w.setBlock(x, y, z, id); },
+    log: (x, y, z, id, ax) => { const c = w.getBlock(x, y, z); if (!c || BL[c].replace || SAPLINGS[c] !== undefined || /leaves/.test(BL[c].key) || !SOLID[c]) w.setBlock(x, y, z, id, { ax: ax || 0 }); },
     leaf: (x, y, z, id) => { const c = w.getBlock(x, y, z); if (!c || (BL[c].replace && !LIQT[c])) w.setBlock(x, y, z, id); },
     r: Math.random
   });
