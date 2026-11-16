@@ -197,6 +197,19 @@ h2{text-shadow:3px 3px 0 #2a2a2a;font-size:36px}
 #boot .logo{margin:0}
 #bootbar{width:min(360px,70vw);height:12px;background:#222;border:2px solid #000;box-shadow:0 0 0 2px #555}#bootbar div{height:100%;width:0;background:#6c6;transition:width .15s}
 #boottxt{font-size:20px;color:#bbb;text-shadow:2px 2px 0 #222}
+#boot{background-size:72px 72px}
+#boot:before{content:'';position:absolute;inset:0;background:radial-gradient(ellipse at center,rgba(0,0,0,0) 30%,rgba(0,0,0,.55) 100%);pointer-events:none}
+#boot>*{position:relative}
+#bootcube{width:72px;height:72px;transform-style:preserve-3d;animation:bcspin 4.5s linear infinite;margin-bottom:18px}
+#bootcube i{position:absolute;width:72px;height:72px;background-size:100% 100%;image-rendering:pixelated;background-image:var(--bc-side);box-shadow:inset 0 0 0 1px rgba(0,0,0,.25)}
+#bootcube .t{background-image:var(--bc-top);transform:rotateX(90deg) translateZ(36px)}#bootcube .d{background-image:var(--bc-dirt);transform:rotateX(-90deg) translateZ(36px);filter:brightness(.55)}
+#bootcube .f{transform:translateZ(36px);filter:brightness(.85)}#bootcube .b{transform:rotateY(180deg) translateZ(36px);filter:brightness(.85)}#bootcube .r{transform:rotateY(90deg) translateZ(36px);filter:brightness(.7)}#bootcube .l{transform:rotateY(-90deg) translateZ(36px);filter:brightness(.7)}
+@keyframes bcspin{0%{transform:rotateX(-24deg) rotateY(0deg)}50%{transform:rotateX(-24deg) rotateY(180deg) translateY(-6px)}100%{transform:rotateX(-24deg) rotateY(360deg)}}
+#bootbar.ind div{width:35%!important;animation:bind 1.2s ease-in-out infinite;background:linear-gradient(90deg,#4a4,#7d7,#4a4)}
+@keyframes bind{0%{transform:translateX(-100%)}100%{transform:translateX(290%)}}
+#bootbar{overflow:hidden;height:14px}
+#bootbar div{background:repeating-linear-gradient(90deg,#5c5 0 10px,#7d7 10px 20px)}
+#boottip{font-size:18px;color:#e8d9a8;text-shadow:2px 2px 0 #1a120c;min-height:22px;max-width:86vw;text-align:center;transition:opacity .25s;margin-top:6px}
 .panel{image-rendering:auto}
 </style>
 </head>
@@ -222,7 +235,25 @@ h2{text-shadow:3px 3px 0 #2a2a2a;font-size:36px}
     </div>
   </div>
   <div id="clickplay">Clique para jogar</div>
-  <div id="boot"><h1 class="logo">VOXEL<span>MUNDO</span></h1><div id="bootbar"><div></div></div><div id="boottxt">Carregando...</div></div>
+  <div id="boot"><div id="bootcube"><i class="t"></i><i class="f"></i><i class="r"></i><i class="b"></i><i class="l"></i><i class="d"></i></div><h1 class="logo">VOXEL<span>MUNDO</span></h1><div id="bootbar" class="ind"><div></div></div><div id="boottxt">Carregando...</div><div id="boottip" data-noi18n></div></div>
+  <script>
+  // tela de carregamento com textura desde o primeiro instante (antes do jogo terminar de carregar)
+  (function () {
+    var seed = 7; function rnd() { seed = (seed * 16807) % 2147483647; return seed / 2147483647; }
+    function tex(fn) { var c = document.createElement('canvas'); c.width = c.height = 16; var g = c.getContext('2d'); for (var y = 0; y < 16; y++) for (var x = 0; x < 16; x++) { g.fillStyle = fn(x, y); g.fillRect(x, y, 1, 1); } return c.toDataURL(); }
+    function dirt() { var r = rnd(); if (r < 0.06) return '#8a8580'; var v = 0.75 + rnd() * 0.35; return 'rgb(' + Math.round(121 * v) + ',' + Math.round(85 * v) + ',' + Math.round(58 * v) + ')'; }
+    function grass() { var v = 0.78 + rnd() * 0.3; return 'rgb(' + Math.round(92 * v) + ',' + Math.round(158 * v) + ',' + Math.round(62 * v) + ')'; }
+    var D = tex(dirt), T = tex(grass), Sd = tex(function (x, y) { var edge = 3 + ((x * 7 + 3) % 3 === 0 ? 1 : 0) + (x % 5 === 2 ? 1 : 0); return y < edge ? grass() : dirt(); });
+    var r = document.documentElement.style; r.setProperty('--dirtbg', 'url(' + D + ')'); r.setProperty('--bc-top', 'url(' + T + ')'); r.setProperty('--bc-side', 'url(' + Sd + ')'); r.setProperty('--bc-dirt', 'url(' + D + ')');
+    var en = (navigator.language || 'pt').toLowerCase().indexOf('pt') !== 0;
+    var tips = en ? ['Tip: hold your finger on a block to break it.', 'Tip: torches keep monsters away at night.', 'Tip: put 4 planks in the grid to make a Crafting Table.', 'Tip: sleep in a bed to skip the night.', 'Tip: invite friends from the pause menu.', 'Tip: two chests side by side make a Big Chest.']
+      : ['Dica: segure o dedo num bloco para quebrar.', 'Dica: tochas espantam os monstros à noite.', 'Dica: 4 tábuas na grade fazem uma Bancada.', 'Dica: dormir numa cama pula a noite.', 'Dica: chame amigos pelo menu de pausa.', 'Dica: dois baús lado a lado viram um Baú Grande.'];
+    var i = Math.floor(Math.random() * tips.length), el = document.getElementById('boottip'), tx = document.getElementById('boottxt');
+    if (tx && en) tx.textContent = 'Loading...';
+    function show() { el.style.opacity = 0; setTimeout(function () { el.textContent = tips[i % tips.length]; el.style.opacity = 1; i++; }, 250); }
+    show(); window._bootTips = setInterval(show, 3500);
+  })();
+  </script>
     <div id="screens">
     <div class="screen" id="s-title">
       <h1 class="logo">VOXEL<span>MUNDO</span><div id="splash"></div></h1>
@@ -4760,7 +4791,7 @@ const G = {
     this.clearWorld(); this.state = 'title'; this.world = new World(hashStr('panorama' + Math.floor(Math.random() * 6)), null, null, 2);
     this.player = new Player(); this.player.mode = 'spectator'; const sp = this.findSpawn(); this.player.pos.set(sp.x, sp.y + 12, sp.z); this.player.pitch = -0.15;
     this.time = 3500; this.rescan = true; $('#hud').classList.add('hidden'); UI.show('s-title'); this.releasePointer();
-    this.booting = performance.now(); const bo = $('#boot'); bo.classList.remove('out', 'hidden'); $('#bootbar div').style.width = '0%';
+    this.booting = performance.now(); const bo = $('#boot'); bo.classList.remove('out', 'hidden'); $('#bootbar').classList.remove('ind'); $('#bootbar div').style.width = '0%';
   },
   newWorld(o) {
     const id = 'w' + Date.now().toString(36); let seed = o.seed.trim(); let s = seed === '' ? (Math.random() * 2e9) | 0 : (/^-?\d+$/.test(seed) ? parseInt(seed) | 0 : hashStr(seed) | 0);
@@ -5052,7 +5083,7 @@ const G = {
     if (st === 'title' && this.booting) { // tela de carregamento: só mostra o menu quando o mundo de fundo estiver pronto
       this.updateChunks(40); const w = this.world, p = this.player, R = Math.min(S.renderDist, 3), pcx = Math.floor(p.pos.x) >> 4, pcz = Math.floor(p.pos.z) >> 4; let n = 0, t = 0;
       for (let dx = -R; dx <= R; dx++) for (let dz = -R; dz <= R; dz++) { t++; const c = w.chunks.get(ckey(pcx + dx, pcz + dz)); if (c && c.meshed) n++; }
-      const el = performance.now() - this.booting; $('#bootbar div').style.width = Math.round(n / t * 100) + '%';
+      const el = performance.now() - this.booting, pc = Math.round(n / t * 100); $('#bootbar div').style.width = pc + '%'; { const tx = $('#boottxt'), en = S.lang === 'en'; tx.textContent = pc < 35 ? (en ? 'Generating terrain...' : 'Gerando o terreno...') : pc < 75 ? (en ? 'Building the blocks...' : 'Montando os blocos...') : (en ? 'Almost there...' : 'Quase lá...'); }
       if ((n >= t && el > 700) || el > 10000) { this.booting = 0; const bo = $('#boot'); bo.classList.add('out'); setTimeout(() => { if (!this.booting) bo.classList.add('hidden'); }, 500); }
       this.updateSky(); this.placeCamera(dt); this.render(); return; }
     if (st === 'title') { this.player.yaw += dt * 0.04; this.updateChunks(10); this.time += dt * 20; this.updateSky(); this.placeCamera(dt); this.render(); return; }
@@ -8363,7 +8394,7 @@ body.touch:not(.taim-cross) #bAtk, body.touch:not(.taim-cross) #bUse{display:non
     if (this.needLift) { this.touchHold = false; }
     return it.apply(this, arguments); };
   // usar/colocar e atacar também respeitam a regra
-  for (const fn of ['use', 'attack']) if (typeof G[fn] === 'function') { const o = G[fn]; G[fn] = function () { if (G.worldLocked()) return; return o.apply(this, arguments); }; }
+  for (const fn of ['use', 'attack']) if (typeof G[fn] === 'function') { const o = G[fn]; G[fn] = function () { if (!(G.player && G.player.net) && G.worldLocked()) return; return o.apply(this, arguments); }; /* ações feitas pelo anfitrião em nome de um convidado não são bloqueadas pela tela do anfitrião */ }
   const cv = G.renderer.domElement;
   const lift = e => { if (!e.touches || e.touches.length === 0) G.needLift = false; };
   window.addEventListener('touchend', lift, true); window.addEventListener('touchcancel', lift, true);
