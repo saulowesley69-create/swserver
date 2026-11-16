@@ -1914,6 +1914,30 @@ IT[IID.melon_slice].icon = () => fromRows(['................', '................
   set('rotten_flesh', ROT, { M: [160, 104, 82], m: [96, 56, 44], G: [104, 132, 58] });
 })();
 
+// ================= MINÉRIOS E BARRAS COM DESENHOS PRÓPRIOS (pedras de verdade, não "pó") =================
+(function () {
+  const set = (k, rows, pal) => { if (IID[k] !== undefined) IT[IID[k]].icon = () => fromRows(rows, Object.assign({ K: [24, 22, 22] }, pal)); };
+  // pedra facetada (carvão, carvão vegetal, fragmento abissal)
+  const ROCK = ['................', '..........KK....', '.......KKKHDK...', '.....KKBBHBBDK..', '...KKBBBBBBBBDK.', '..KHHBBBDDBBBBK.', '..KHBBBBDBBBBDK.', '.KHBBBBBBBBBBDK.', '.KBBBDDBBBBBDK..', '.KBBBBBBBHBBDK..', '.KDBBBBBBBBDDK..', '..KDDBBBBBDDK...', '...KKDDDDDKK....', '.....KKKKK......', '................', '................'];
+  set('coal', ROCK, { B: [38, 38, 42], D: [22, 22, 26], H: [118, 118, 128] });
+  const CHAR = ['................', '..........KK....', '.......KKKHDK...', '.....KKBGHBBDK..', '...KKBBBGBBBBDK.', '..KHHBBBDGBBBBK.', '..KHBGBBDBGBBDK.', '.KHBBGBBBBGBBDK.', '.KBBBDGBBBBGDK..', '.KBGBBBGBHBBDK..', '.KDBGBBBGBBDDK..', '..KDDBGBBBDDK...', '...KKDDDDDKK....', '.....KKKKK......', '................', '................'];
+  set('charcoal', CHAR, { B: [62, 48, 38], D: [38, 28, 22], G: [86, 66, 50], H: [140, 116, 96] });
+  set('netherite_scrap', ROCK, { B: [74, 56, 52], D: [44, 32, 32], H: [168, 120, 150] });
+  // minério bruto: pedaço de rocha com veios e pontos do metal
+  const ORE = ['................', '..........KK....', '.......KKKMsK...', '.....KKSSMMSsK..', '...KKSSSSmSSSsK.', '..KWMSSSSSSMMSK.', '..KMMSsSSSSmSsK.', '.KSSmSSSMMSSSsK.', '.KSSSSSMmSSSsK..', '.KsSMSSSSSSMsK..', '.KsSMMSSsSSssK..', '..KssSSmSSssK...', '...KKsssssKK....', '.....KKKKK......', '................', '................'];
+  const STONE = { S: [128, 122, 116], s: [98, 94, 90], W: [255, 255, 255] };
+  set('raw_iron', ORE, Object.assign({}, STONE, { M: [232, 206, 182], m: [178, 140, 118] }));
+  set('raw_gold', ORE, Object.assign({}, STONE, { M: [252, 216, 64], m: [196, 146, 26] }));
+  set('raw_copper', ORE, Object.assign({}, STONE, { M: [236, 132, 84], m: [92, 176, 150] }));
+  set('lapis', ORE, { S: [44, 74, 186], s: [30, 50, 140], M: [104, 144, 244], m: [222, 192, 84], W: [210, 226, 255] });
+  // barras: um lingote em pé, com a face de cima clara e a da frente mais escura
+  const BAR = ['................', '................', '................', '....KKKKKKKK....', '...KTTTHTTTTK...', '..KTTHTTTTTTTK..', '.KKKKKKKKKKKKKK.', '.KFFFFFFFFFFFFK.', '.KFHFFFFFFFFFFK.', '.KFFFFFFFFFFFFK.', '.KFFFFFFFFFFFdK.', '.KddddddddddddK.', '..KKKKKKKKKKKK..', '................', '................', '................'];
+  set('iron_ingot', BAR, { T: [236, 236, 236], H: [255, 255, 255], F: [196, 196, 200], d: [150, 150, 158] });
+  set('gold_ingot', BAR, { T: [255, 230, 96], H: [255, 252, 200], F: [236, 184, 40], d: [184, 128, 20] });
+  set('copper_ingot', BAR, { T: [240, 148, 100], H: [255, 206, 170], F: [206, 110, 70], d: [150, 74, 48] });
+  set('netherite_ingot', BAR, { T: [92, 80, 86], H: [170, 150, 160], F: [64, 54, 58], d: [40, 34, 38] });
+})();
+
 // ================= MUNDO =================
 const CS = 16, WH = 160, NH = 96, SEA = 40;
 const ckey = (cx, cz) => cx + ',' + cz;
@@ -2217,7 +2241,8 @@ class World {
     if (!SOLID[id]) {
       const above = this.getBlock(x, y + 1, z);
       if (above && BL[above].fall) this.settle(x, y + 1, z);
-      else if (above && (BL[above].cross || BL[above].torch || BL[above].boxes === 'rail') && !(above === B_('sugarcane') && id === B_('sugarcane'))) { this.setBlock(x, y + 1, z, 0); if (this.onPop) this.onPop(x, y + 1, z, above); }
+      else if (above && (BL[above].cross || (BL[above].torch && !wallTorch(this, x, y + 1, z)) || BL[above].boxes === 'rail') && !(above === B_('sugarcane') && id === B_('sugarcane'))) { this.setBlock(x, y + 1, z, 0); if (this.onPop) this.onPop(x, y + 1, z, above); }
+      for (const [dx, dz] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) { const n = this.getBlock(x + dx, y, z + dz); if (!n || !BL[n].torch) continue; const tw = wallTorch(this, x + dx, y, z + dz); if (tw && tw[0] === -dx && tw[1] === -dz) { this.setBlock(x + dx, y, z + dz, 0); if (this.onPop) this.onPop(x + dx, y, z + dz, n); } }
     }
     if (BL[id] && BL[id].fall) this.settle(x, y, z);
   }
@@ -2232,7 +2257,7 @@ class World {
     if (b.shape === 'panel') { const bd = this.bdata && this.bdata[x + ',' + y + ',' + z]; let side = bd && bd.f !== undefined ? bd.f : -1; const sup = n => SOLID[n] && !LIQT[n] && !BL[n].cross && !BL[n].shape;
       if (side < 0) { const N4 = [[1, 0], [-1, 0], [0, 1], [0, -1]]; for (let yy = y; yy < y + 10 && side < 0; yy++) { if (yy > y && this.getBlock(x, yy, z) !== id) break; for (let q = 0; q < 4; q++) if (sup(this.getBlock(x + N4[q][0], yy, z + N4[q][1]))) { side = q; break; } } if (side < 0) side = 0; }
       const T = 3 / 16; return side === 0 ? [1 - T, 0, 0, 1, 1, 1] : side === 1 ? [0, 0, 0, T, 1, 1] : side === 2 ? [0, 0, 1 - T, 1, 1, 1] : [0, 0, 0, 1, 1, T]; }
-    if (b.torch) return [0.4, 0, 0.4, 0.6, 0.62, 0.6];
+    if (b.torch) { const tw = wallTorch(this, x, y, z); if (tw) { const cx = 0.5 + tw[0] * 0.3, cz = 0.5 + tw[1] * 0.3; return [cx - 0.15, 0.2, cz - 0.15, cx + 0.15, 0.82, cz + 0.15]; } return [0.4, 0, 0.4, 0.6, 0.62, 0.6]; }
     if (b.cross) return id === BID.fire ? [0, 0, 0, 1, 0.06, 1] : [0.18, 0, 0.18, 0.82, id === BID.sugarcane ? 1 : 0.8, 0.82];
     if (b.shape === 'door') { const bd = this.bdata && this.bdata[x + ',' + y + ',' + z]; const f0 = bd && bd.f !== undefined ? bd.f : 5, side = id === BID.door_open ? ({ 2: 5, 3: 5, 4: 3, 5: 3 })[f0] : f0, T3 = 3 / 16; return side === 2 ? [1 - T3, 0, 0, 1, 1, 1] : side === 3 ? [0, 0, 0, T3, 1, 1] : side === 4 ? [0, 0, 1 - T3, 1, 1, 1] : [0, 0, 0, 1, 1, T3]; }
     if (b.boxes) { const bx = blockBoxes(id, x, y, z, false, this); if (!bx.length) return [0, 0, 0, 1, 1, 1]; const u = [1, 1, 1, 0, 0, 0]; for (const q of bx) for (let a = 0; a < 3; a++) { u[a] = Math.min(u[a], q[a]); u[a + 3] = Math.max(u[a + 3], q[a + 3]); } return u; }
@@ -2330,8 +2355,8 @@ function meshChunk(world, ch) {
       continue;
     }
     if (b.torch) {
-      const t = b.tex.side; const x0 = 7 / 16, x1 = 9 / 16, h = 10 / 16;
-      for (let f = 0; f < 6; f++) { if (f === 1) continue; const F = FACES[f]; for (let k = 0; k < 4; k++) { const c = F.c[k]; const px = c[0] ? x1 : x0, py = c[1] ? h : 0, pz = c[2] ? x1 : x0; verts[k] = [x + px, y + py, z + pz]; let ua, va; if (f === 0) { ua = c[0] ? x1 : x0; va = c[2] ? 10 / 16 : 8 / 16; } else { ua = FUV[k][0] ? x1 : x0; va = FUV[k][1] ? h : 0; } uvs[k] = tileUV(t, ua, va); cols[k] = 1; } pushQuad(S_, verts, uvs, cols, 1, 1, false); }
+      const t = b.tex.side; const x0 = 7 / 16, x1 = 9 / 16, h = 10 / 16; const tw = wallTorch(world, ch.cx * 16 + x, y, ch.cz * 16 + z);
+      for (let f = 0; f < 6; f++) { if (f === 1) continue; const F = FACES[f]; for (let k = 0; k < 4; k++) { const c = F.c[k]; const px = c[0] ? x1 : x0, py = c[1] ? h : 0, pz = c[2] ? x1 : x0; verts[k] = tw ? tiltTorch(x, y, z, px, py, pz, tw) : [x + px, y + py, z + pz]; let ua, va; if (f === 0) { ua = c[0] ? x1 : x0; va = c[2] ? 10 / 16 : 8 / 16; } else { ua = FUV[k][0] ? x1 : x0; va = FUV[k][1] ? h : 0; } uvs[k] = tileUV(t, ua, va); cols[k] = 1; } pushQuad(S_, verts, uvs, cols, 1, 1, false); }
       continue;
     }
     if (b.liquid) {
@@ -2448,6 +2473,13 @@ function render3DIcon(geo, mat, scale) {
     const c = pixCanvas(64), g = c.getContext('2d'); g.drawImage(r.domElement, 0, 0); return c;
   } catch (e) { return null; }
 }
+
+// tocha presa na parede: tw = [dx, dz] aponta da tocha para a parede
+function wallTorch(w, x, y, z) { const d = w.bdata && w.bdata[x + ',' + y + ',' + z]; return d && d.tw ? d.tw : null; }
+// inclina a tocha uns 22° para longe da parede, com a base encostada nela
+function tiltTorch(x, y, z, px, py, pz, tw) { const a = 0.4, ca = Math.cos(a), sa = Math.sin(a); let lx = px - 0.5, lz = pz - 0.5; const u = lx * tw[0] + lz * tw[1];
+  const u2 = u * ca - py * sa, y2 = u * sa + py * ca; lx += (u2 - u) * tw[0]; lz += (u2 - u) * tw[1];
+  return [x + 0.5 + lx + tw[0] * 0.38, y + 0.2 + y2, z + 0.5 + lz + tw[1] * 0.38]; }
 
 // ================= ESTRUTURAS: vilas, masmorras, navios naufragados =================
 const STRUCT = { village: { cell: 320, chance: 0.65, name: 'Vila' }, dungeon: { cell: 240, chance: 0.5, name: 'Masmorra' }, ship: { cell: 176, chance: 0.75, name: 'Navio naufragado' } };
@@ -5306,6 +5338,7 @@ const G = {
       let bedDir = null;
       if (nb.shape === 'bed') { const fx = -Math.sin(p.yaw), fz = -Math.cos(p.yaw); bedDir = Math.abs(fx) > Math.abs(fz) ? (fx > 0 ? 0 : 1) : (fz > 0 ? 2 : 3); const D = BED_DIRS[bedDir], hc = w.getBlock(x + D[0], y, z + D[1]); if (hc && !BL[hc].replace) { UI.toast('A cama precisa de 2 blocos livres.'); return; } }
       w.setBlock(x, y, z, bedDir !== null ? BID.bed_foot : it.block);
+      if (nb.torch && t.n[1] === 0 && SOLID[t.id] && !BL[t.id].replace) { w.bdata[x + ',' + y + ',' + z] = { tw: [-t.n[0], -t.n[2]] }; w.markDirty(x >> 4, z >> 4); }
       if (nb.shape === 'panel' && t.n[1] === 0) { w.bdata[x + ',' + y + ',' + z] = { f: t.n[0] === -1 ? 0 : t.n[0] === 1 ? 1 : t.n[2] === -1 ? 2 : 3 }; w.markDirty(x >> 4, z >> 4); }
       if (bedDir !== null) { const D = BED_DIRS[bedDir]; w.bdata[x + ',' + y + ',' + z] = { f: bedDir }; w.setBlock(x + D[0], y, z + D[1], BID.bed, { noUpdate: true }); w.bdata[(x + D[0]) + ',' + y + ',' + (z + D[1])] = { f: bedDir }; w.markDirty(x >> 4, z >> 4); w.markDirty((x + D[0]) >> 4, (z + D[1]) >> 4); }
       if (nb.shape === 'door') { const f = this.facingFromPlayer(); w.bdata[x + ',' + y + ',' + z] = { f }; w.setBlock(x, y + 1, z, it.block, { noUpdate: true }); w.bdata[x + ',' + (y + 1) + ',' + z] = { f }; w.markDirty(x >> 4, z >> 4); }
@@ -8287,6 +8320,50 @@ body.touch:not(.taim-cross) #bAtk, body.touch:not(.taim-cross) #bUse{display:non
     ring.classList.add('on'); ring.style.left = aim.x + 'px'; ring.style.top = aim.y + 'px';
     const b = G.breaking; ring.style.setProperty('--p', b && G.player.mode !== 'creative' ? Math.min(1, b.prog).toFixed(3) : 0); };
   loop();
+})();
+
+// ===== FORNALHA: chama de verdade (desenho de pixel) que vai apagando, seta que enche e casas maiores =====
+(function () {
+  const FLAME = 'polygon(45% 0,55% 0,55% 12%,62% 12%,62% 24%,72% 24%,72% 36%,82% 36%,82% 48%,90% 48%,90% 84%,82% 84%,82% 92%,72% 92%,72% 100%,28% 100%,28% 92%,18% 92%,18% 84%,10% 84%,10% 54%,18% 54%,18% 42%,28% 42%,28% 54%,36% 54%,36% 30%,45% 30%)';
+  const ARROW = 'polygon(0 36%,58% 36%,58% 8%,100% 50%,58% 92%,58% 64%,0 64%)';
+  const st = document.createElement('style'); st.textContent = `
+.furn{display:flex;align-items:center;justify-content:center;gap:calc(var(--s) * .45);margin:8px auto;padding:calc(var(--s) * .3) calc(var(--s) * .5);background:#b9b9b9;border:3px solid;border-color:#555 #fff #fff #555}
+.furn .fcol{gap:calc(var(--s) * .12)}
+.furn .slot{width:calc(var(--s) * 1.15);height:calc(var(--s) * 1.15)}
+.furn .slot.big{width:calc(var(--s) * 1.5);height:calc(var(--s) * 1.5)}
+.flame{width:calc(var(--s) * .72);height:calc(var(--s) * .72);background:#6f6f6f;clip-path:${FLAME};position:relative;overflow:hidden}
+.flame div{position:absolute;left:0;right:0;bottom:0;background:linear-gradient(#fff2a0 0%,#ffcf20 30%,#ff8a00 65%,#e03a00 100%);height:0;transition:height .3s linear}
+.flame.on{animation:flk .35s steps(2) infinite}
+@keyframes flk{50%{filter:brightness(1.18)}}
+.farrow{width:calc(var(--s) * 1.3);height:calc(var(--s) * .62);background:#6f6f6f;clip-path:${ARROW};position:relative}
+.farrow div{height:100%;background:linear-gradient(90deg,#fff,#ffe9a0);width:0;transition:width .25s linear}
+.furn .ftag{font-size:max(11px,calc(var(--s) * .26));color:#3f3f3f;text-align:center;line-height:1}`;
+  document.head.appendChild(st);
+  // liga a animação da chama quando está queimando
+  const uf = UI.updateFurnaceUI; UI.updateFurnaceUI = function () { const r = uf.apply(this, arguments); const c = this.container, fl = document.querySelector('.flame'); if (fl && c) fl.classList.toggle('on', c.burn > 0); return r; };
+})();
+
+// ===== REGRAS GLOBAIS: quando uma tela está aberta (inventário, baú, chat, pausa, morte), nada acontece no mundo =====
+(function () {
+  G.worldLocked = function () { return this.state !== 'play' || !!UI.open || !!UI.chatOpen || !!(this.player && this.player.dead); };
+  let wasLocked = false;
+  G.needLift = false; // depois de fechar uma tela, só volta a quebrar/colocar quando todos os dedos saírem da tela
+  const clearActs = g => { g.mouse.l = g.mouse.r = false; g.touchHold = false; g.lPressed = g.rPressed = false; g.breaking = null; g.joy.f = g.joy.s = 0; g.touchRun = g.dpadRun = g.sprintTap = false; if (g.crack) g.crack.visible = false; };
+  const it = G.interact; G.interact = function (dt) {
+    const L = G.worldLocked();
+    if (L) { if (!wasLocked) { clearActs(this); this.needLift = true; } wasLocked = true; this.target = null; this.entTarget = null; if (this.hl) this.hl.visible = false; this.breaking = null; return; }
+    if (wasLocked) { wasLocked = false; clearActs(this); if (!document.body.classList.contains('touch')) this.needLift = false; }
+    if (this.needLift) { this.touchHold = false; }
+    return it.apply(this, arguments); };
+  // usar/colocar e atacar também respeitam a regra
+  for (const fn of ['use', 'attack']) if (typeof G[fn] === 'function') { const o = G[fn]; G[fn] = function () { if (G.worldLocked()) return; return o.apply(this, arguments); }; }
+  const cv = G.renderer.domElement;
+  const lift = e => { if (!e.touches || e.touches.length === 0) G.needLift = false; };
+  window.addEventListener('touchend', lift, true); window.addEventListener('touchcancel', lift, true);
+  // um toque que começou com a tela aberta não vira "segurar para quebrar" quando ela fecha
+  cv.addEventListener('touchstart', () => { if (G.worldLocked()) G.needLift = true; }, { passive: true, capture: true });
+  // perder o foco (trocar de app, notificação) solta tudo
+  window.addEventListener('blur', () => clearActs(G)); document.addEventListener('visibilitychange', () => { if (document.hidden) clearActs(G); });
 })();
 </script>
 </body>
