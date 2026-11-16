@@ -1686,6 +1686,55 @@ IT[IID.melon_slice].icon = () => fromRows(['................', '................
   set('netherite_ingot', BAR, { T: [92, 80, 86], H: [170, 150, 160], F: [64, 54, 58], d: [40, 34, 38] });
 })();
 
+// ================= FORMAS DE ÁRVORE (as mesmas no mundo gerado e quando a muda cresce) =================
+// t = { get(x,y,z), log(x,y,z,id), leaf(x,y,z,id), r() }  — leaf só ocupa espaço vazio
+window.TREES = (function () {
+  const B = k => BID[k];
+  const ri = (t, a, b) => a + Math.floor(t.r() * (b - a + 1));
+  // bolota de folhas achatada (copa dos galhos do carvalho grande)
+  function cluster(t, cx, cy, cz, leaf, big) {
+    const R = big ? 2.9 : 2.5;
+    for (let dy = -1; dy <= 2; dy++) { const rr = dy === -1 ? R - 0.9 : dy === 2 ? R - 1.1 : R; for (let dx = -3; dx <= 3; dx++) for (let dz = -3; dz <= 3; dz++) { const d = dx * dx + dz * dz; if (d > rr * rr) continue; if (d > (rr - 0.7) * (rr - 0.7) && t.r() < 0.35) continue; t.leaf(cx + dx, cy + dy, cz + dz, leaf); } }
+  }
+  // linha de tronco (galho) de a até b
+  function branch(t, x0, y0, z0, x1, y1, z1, log) {
+    const n = Math.max(Math.abs(x1 - x0), Math.abs(y1 - y0), Math.abs(z1 - z0)); for (let i = 1; i <= n; i++) { const f = i / n; t.log(Math.round(x0 + (x1 - x0) * f), Math.round(y0 + (y1 - y0) * f), Math.round(z0 + (z1 - z0) * f), log); }
+  }
+  const T = {
+    // carvalho comum
+    oak(t, x, y, z, o) { o = o || {}; const log = o.log || B('log'), leaf = o.leaf || B('leaves'), h = o.h || ri(t, 4, 6);
+      for (let i = 0; i < h; i++) t.log(x, y + i, z, log); const ty = y + h - 1;
+      for (let ly = ty - 2; ly <= ty + 1; ly++) { const rad = ly >= ty ? 1 : 2; for (let dx = -rad; dx <= rad; dx++) for (let dz = -rad; dz <= rad; dz++) { if (Math.abs(dx) === rad && Math.abs(dz) === rad && (ly === ty + 1 || t.r() < 0.5)) continue; t.leaf(x + dx, ly, z + dz, leaf); } } },
+    // carvalho grande: tronco alto, galhos de madeira que saem para os lados e cada galho com sua copa
+    fancyOak(t, x, y, z, o) { o = o || {}; const log = o.log || B('log'), leaf = o.leaf || B('leaves'), h = ri(t, 9, 14);
+      for (let i = 0; i < h; i++) t.log(x, y + i, z, log);
+      const n = ri(t, 4, 6), a0 = t.r() * Math.PI * 2;
+      for (let b = 0; b < n; b++) { const a = a0 + b * (Math.PI * 2 / n) + (t.r() - 0.5) * 0.8, by = y + Math.floor(h * 0.45) + Math.floor(t.r() * h * 0.4), len = 2.6 + t.r() * 1.9, up = 1 + Math.floor(t.r() * 3);
+        const lim = o.maxR ? Math.max(1, o.maxR - 3) : 9, cl = v => Math.max(-lim, Math.min(lim, v)), ex = x + cl(Math.round(Math.cos(a) * len)), ez = z + cl(Math.round(Math.sin(a) * len)), ey = Math.min(y + h, by + up);
+        branch(t, x, by, z, ex, ey, ez, log); cluster(t, ex, ey + 1, ez, leaf, false); }
+      cluster(t, x, y + h - 1, z, leaf, true); },
+    // pinheiro: cone em camadas que alternam largo/estreito, ponta fina
+    spruce(t, x, y, z, o) { o = o || {}; const log = B('spruce_log'), leaf = B('spruce_leaves'), h = o.h || ri(t, 7, 10), bare = ri(t, 1, 2), top = y + h;
+      t.leaf(x, top + 1, z, leaf); t.leaf(x, top, z, leaf); for (const [dx, dz] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) t.leaf(x + dx, top, z + dz, leaf);
+      const fh = top - 1 - (y + bare); let tier = 0;
+      for (let ly = top - 1; ly >= y + bare; ly--, tier++) { const grow = Math.min(3, 1 + Math.floor(tier * 2.6 / Math.max(1, fh))), rad = tier % 2 ? grow : Math.max(1, grow - 1);
+        for (let dx = -rad; dx <= rad; dx++) for (let dz = -rad; dz <= rad; dz++) { const d = dx * dx + dz * dz; if (d > rad * rad + (rad > 1 ? 1 : 0)) continue; if (d === rad * rad + 1 && t.r() < 0.4) continue; t.leaf(x + dx, ly, z + dz, leaf); } }
+      for (let i = 0; i < h; i++) t.log(x, y + i, z, log); },
+    // pinheiro de montanha: alto e fino, folhas só em cima
+    pine(t, x, y, z) { const log = B('spruce_log'), leaf = B('spruce_leaves'), h = ri(t, 8, 12), top = y + h;
+      t.leaf(x, top + 1, z, leaf); for (let ly = top; ly >= top - ri(t, 3, 4); ly--) { const rad = ly === top ? 1 : (top - ly) % 2 ? 2 : 1; for (let dx = -rad; dx <= rad; dx++) for (let dz = -rad; dz <= rad; dz++) if (Math.abs(dx) + Math.abs(dz) <= rad + (rad > 1 ? 0 : 0) || (rad === 2 && Math.abs(dx) + Math.abs(dz) <= 3 && t.r() < 0.5)) t.leaf(x + dx, ly, z + dz, leaf); }
+      for (let i = 0; i < h; i++) t.log(x, y + i, z, log); },
+    // pinheiro gigante 2x2 (de 4 mudas em quadrado, ou raro na taiga)
+    megaSpruce(t, x, y, z) { const log = B('spruce_log'), leaf = B('spruce_leaves'), h = ri(t, 16, 24), top = y + h, fstart = y + Math.floor(h * 0.5);
+      for (let ly = top + 1; ly >= fstart; ly--) { const k = top + 1 - ly, base = Math.min(5, 1 + Math.floor(k / 3)), rad = k % 3 === 2 ? Math.max(1, base - 1) : base;
+        for (let dx = -rad; dx <= rad + 1; dx++) for (let dz = -rad; dz <= rad + 1; dz++) { const ex = dx <= 0 ? -dx : dx - 1, ez = dz <= 0 ? -dz : dz - 1; const d = ex * ex + ez * ez; if (d > rad * rad) continue; if (d > (rad - 1) * (rad - 1) && t.r() < 0.25) continue; t.leaf(x + dx, ly, z + dz, leaf); } }
+      for (let i = 0; i < h; i++) for (const [dx, dz] of [[0, 0], [1, 0], [0, 1], [1, 1]]) t.log(x + dx, y + i, z + dz, log);
+      if (BID.podzol !== undefined) for (let dx = -2; dx <= 3; dx++) for (let dz = -2; dz <= 3; dz++) if (t.r() < 0.7 && t.get(x + dx, y - 1, z + dz) === B('grass')) t.log(x + dx, y - 1, z + dz, BID.podzol); },
+    birch(t, x, y, z, o) { o = o || {}; T.oak(t, x, y, z, { log: B('birch_log'), leaf: B('birch_leaves'), h: o.tall ? ri(t, 8, 11) : ri(t, 5, 7) }); }
+  };
+  return T;
+})();
+
 // ================= MUNDO =================
 const CS = 16, WH = 160, NH = 96, SEA = 40;
 const ckey = (cx, cz) => cx + ',' + cz;
@@ -1879,6 +1928,7 @@ class World {
       if (red) { for (let dx = -2; dx <= 2; dx++) for (let dz = -2; dz <= 2; dz++) { if (Math.abs(dx) === 2 && Math.abs(dz) === 2) continue; leafAt(x + dx, ty, z + dz, C); if (Math.abs(dx) === 2 || Math.abs(dz) === 2) for (let k = 1; k <= 2; k++) leafAt(x + dx, ty - k, z + dz, C); } }
       else for (let dx = -3; dx <= 3; dx++) for (let dz = -3; dz <= 3; dz++) { if (Math.abs(dx) === 3 && Math.abs(dz) === 3) continue; leafAt(x + dx, ty, z + dz, C); } };
     const spike = (x, y, z) => { const P = B_('packed_ice'), hgt = 6 + (r() * 10 | 0), big = hgt > 11; for (let i = -1; i < hgt; i++) { const f = i / hgt, rad = big ? (f < 0.3 ? 1.6 : f < 0.65 ? 1.1 : 0.4) : (f < 0.4 ? 1.0 : 0.3); for (let dx = -2; dx <= 2; dx++) for (let dz = -2; dz <= 2; dz++) if (dx * dx + dz * dz <= rad * rad + 0.3) set(x + dx, y + i, z + dz, P); } };
+    const G6 = this.gen >= 6, TA = { get, log: set, leaf: leafAt, r }, mega = (x, z) => x >= 5 && x <= 9 && z >= 5 && z <= 9;
     const FLOWERS = [B_('dandelion'), B_('poppy'), B_('cornflower'), B_('allium'), B_('orange_tulip'), B_('oxeye_daisy')];
     const SANDS = new Set([B_('sand'), B_('red_sand')]), GROUND = new Set([B_('grass'), B_('snow_grass'), B_('dirt'), B_('mycelium'), B_('snow')]);
     for (let z = 0; z < 16; z++) for (let x = 0; x < 16; x++) {
@@ -1888,12 +1938,12 @@ class World {
       // cana-de-açúcar: só na beira da água (água ao lado do bloco de chão), até 3 de altura
       if (h === SEA && (onGrass || SANDS.has(topId) || topId === B_('dirt')) && k > 0.86 && bio !== BIOME.SNOW) { let nearW = false; for (const [dx, dz] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) if (LIQT[get(x + dx, h, z + dz)] === 1) nearW = true; if (nearW) { const n = 1 + (r() * 3 | 0); for (let i = 1; i <= n; i++) set(x, h + i, z, B_('sugarcane')); continue; } }
       if (onGrass) {
-        if (bio === BIOME.PLAINS) { if (k < 0.003 && inner(x, z, 2) && !logNear(x, y1, z, 4)) oak(x, y1, z, B_('log'), B_('leaves'), 4 + (r() * 3 | 0)); else if (k < 0.12) set(x, y1, z, B_('tallgrass')); else if (k < 0.13) set(x, y1, z, B_('dandelion')); else if (k < 0.137) set(x, y1, z, B_('poppy')); else if (k < 0.1375) set(x, y1, z, B_('pumpkin')); }
-        else if (bio === BIOME.FOREST) { if (k < 0.045 && inner(x, z, 2) && !logNear(x, y1, z, 2)) { const birch = hash3(wx, 9, wz, seed) < 0.15; oak(x, y1, z, birch ? B_('birch_log') : B_('log'), birch ? B_('birch_leaves') : B_('leaves'), (birch ? 5 : 4) + (r() * 3 | 0)); } else if (k < 0.2) set(x, y1, z, B_('tallgrass')); else if (k < 0.205) set(x, y1, z, B_('brown_mushroom')); else if (k < 0.208) set(x, y1, z, B_('red_mushroom')); else if (k < 0.215) set(x, y1, z, B_('poppy')); }
-        else if (bio === BIOME.BIRCH) { if (k < 0.04 && inner(x, z, 2) && !logNear(x, y1, z, 2)) oak(x, y1, z, B_('birch_log'), B_('birch_leaves'), 5 + (r() * 3 | 0)); else if (k < 0.16) set(x, y1, z, B_('tallgrass')); else if (k < 0.17) set(x, y1, z, B_('dandelion')); else if (k < 0.175) set(x, y1, z, B_('poppy')); }
-        else if (bio === BIOME.SNOW) { if (k < 0.025 && inner(x, z, 2) && !logNear(x, y1, z, 2)) spruce(x, y1, z, 6 + (r() * 4 | 0)); else if (k < 0.05) set(x, y1, z, B_('tallgrass')); }
-        else if (bio === 21) { if (k < 0.04 && inner(x, z, 2) && !logNear(x, y1, z, 2)) spruce(x, y1, z, 6 + (r() * 5 | 0)); else if (k < 0.16) set(x, y1, z, B_('tallgrass')); else if (k < 0.165) set(x, y1, z, B_('brown_mushroom')); }
-        else if (bio === BIOME.MOUNTAIN) { if (k < 0.01 && inner(x, z, 2) && !logNear(x, y1, z, 2)) spruce(x, y1, z, 5 + (r() * 3 | 0)); }
+        if (bio === BIOME.PLAINS) { if (k < 0.003 && inner(x, z, 2) && !logNear(x, y1, z, 4)) { if (G6 && inner(x, z, 6) && r() < 0.3) TREES.fancyOak(TA, x, y1, z, { maxR: Math.min(x, 15 - x, z, 15 - z) }); else oak(x, y1, z, B_('log'), B_('leaves'), 4 + (r() * 3 | 0)); } else if (k < 0.12) set(x, y1, z, B_('tallgrass')); else if (k < 0.13) set(x, y1, z, B_('dandelion')); else if (k < 0.137) set(x, y1, z, B_('poppy')); else if (k < 0.1375) set(x, y1, z, B_('pumpkin')); }
+        else if (bio === BIOME.FOREST) { if (k < 0.045 && inner(x, z, 2) && !logNear(x, y1, z, 2)) { const birch = hash3(wx, 9, wz, seed) < 0.15; if (G6 && !birch && inner(x, z, 6) && !logNear(x, y1, z, 4) && r() < 0.12) TREES.fancyOak(TA, x, y1, z, { maxR: Math.min(x, 15 - x, z, 15 - z) }); else oak(x, y1, z, birch ? B_('birch_log') : B_('log'), birch ? B_('birch_leaves') : B_('leaves'), (birch ? 5 : 4) + (r() * 3 | 0)); } else if (k < 0.2) set(x, y1, z, B_('tallgrass')); else if (k < 0.205) set(x, y1, z, B_('brown_mushroom')); else if (k < 0.208) set(x, y1, z, B_('red_mushroom')); else if (k < 0.215) set(x, y1, z, B_('poppy')); }
+        else if (bio === BIOME.BIRCH) { if (k < 0.04 && inner(x, z, 2) && !logNear(x, y1, z, 2)) { if (G6) TREES.birch(TA, x, y1, z, { tall: r() < 0.15 }); else oak(x, y1, z, B_('birch_log'), B_('birch_leaves'), 5 + (r() * 3 | 0)); } else if (k < 0.16) set(x, y1, z, B_('tallgrass')); else if (k < 0.17) set(x, y1, z, B_('dandelion')); else if (k < 0.175) set(x, y1, z, B_('poppy')); }
+        else if (bio === BIOME.SNOW) { if (k < 0.025 && inner(x, z, 2) && !logNear(x, y1, z, 2)) { if (G6) (r() < 0.35 ? TREES.pine : TREES.spruce)(TA, x, y1, z); else spruce(x, y1, z, 6 + (r() * 4 | 0)); } else if (k < 0.05) set(x, y1, z, B_('tallgrass')); }
+        else if (bio === 21) { if (k < 0.04 && inner(x, z, 3) && !logNear(x, y1, z, 2)) { if (G6 && mega(x, z) && r() < 0.18 && !logNear(x, y1, z, 5) && get(x + 1, h, z) === topId && get(x, h, z + 1) === topId && get(x + 1, h, z + 1) === topId) TREES.megaSpruce(TA, x, y1, z); else if (G6) (r() < 0.25 ? TREES.pine : TREES.spruce)(TA, x, y1, z); else spruce(x, y1, z, 6 + (r() * 5 | 0)); } else if (k < 0.16) set(x, y1, z, B_('tallgrass')); else if (k < 0.165) set(x, y1, z, B_('brown_mushroom')); }
+        else if (bio === BIOME.MOUNTAIN) { if (k < 0.01 && inner(x, z, 2) && !logNear(x, y1, z, 2)) { if (G6) TREES.pine(TA, x, y1, z); else spruce(x, y1, z, 5 + (r() * 3 | 0)); } }
         else if (bio === BIOME.SAVANNA) { if (k < 0.005 && inner(x, z, 3) && !logNear(x, y1, z, 5)) acacia(x, y1, z); else if (k < 0.32) set(x, y1, z, B_('tallgrass')); }
         else if (bio === BIOME.JUNGLE) { if (k < 0.03 && inner(x, z, 3) && !logNear(x, y1, z, 3)) jungle(x, y1, z, 8 + (r() * 6 | 0)); else if (k < 0.08 && inner(x, z, 1) && !logNear(x, y1, z, 1)) bush(x, y1, z); else if (k < 0.38) set(x, y1, z, B_('tallgrass')); else if (k < 0.385) set(x, y1, z, B_('melon')); }
         else if (bio === 13) { if (k < 0.03 && inner(x, z, 3) && !logNear(x, y1, z, 4)) cherry(x, y1, z); else if (k < 0.2) set(x, y1, z, B_('pink_petals')); else if (k < 0.3) set(x, y1, z, B_('tallgrass')); else if (k < 0.31) set(x, y1, z, B_('allium')); }
@@ -4513,7 +4563,7 @@ const G = {
   },
   newWorld(o) {
     const id = 'w' + Date.now().toString(36); let seed = o.seed.trim(); let s = seed === '' ? (Math.random() * 2e9) | 0 : (/^-?\d+$/.test(seed) ? parseInt(seed) | 0 : hashStr(seed) | 0);
-    const meta = { id, name: o.name || 'Novo Mundo', seed: s, mode: o.mode, last: Date.now(), difficulty: o.difficulty, cheats: o.cheats, keepInv: o.keepInv || o.type === 'arena' || o.type === 'kitpvp', gen: 5, type: o.type || 'normal' };
+    const meta = { id, name: o.name || 'Novo Mundo', seed: s, mode: o.mode, last: Date.now(), difficulty: o.difficulty, cheats: o.cheats, keepInv: o.keepInv || o.type === 'arena' || o.type === 'kitpvp', gen: 6, type: o.type || 'normal' };
     const ws = this.listWorlds(); ws.push(meta); this.setWorlds(ws); this.startGame(meta, null);
   },
   readWorldData(meta) { try { return JSON.parse(localStorage.getItem('vm_w_' + meta.id)); } catch (e) { return null; } },
@@ -8380,7 +8430,7 @@ body.touch #actbtn.show{display:block}`;
     const meta = WS.cache.find(m => m.id === this.meta.id) || Object.assign(this.meta, { folder: this.meta.folder || uniqueFolder(this.meta.name) }); if (!WS.cache.includes(meta)) WS.cache.push(meta);
     meta.last = Date.now(); meta.mode = this.hardcore ? 'hardcore' : this.player.mode;
     const snap = JSON.parse(JSON.stringify(data)); // cópia: o jogo continua mudando os dados enquanto salva
-    let icon = null; try { if (this.state === 'play' && this.renderer) { this.render(); const c = document.createElement('canvas'); c.width = 160; c.height = 90; const src = this.renderer.domElement, k = Math.max(160 / src.width, 90 / src.height), w = src.width * k, h = src.height * k; c.getContext('2d').drawImage(src, (160 - w) / 2, (90 - h) / 2, w, h); icon = c.toDataURL('image/png').split(',')[1]; meta.icon = 'data:image/png;base64,' + icon; } } catch (e) { }
+    let icon = null; try { if (this.state === 'play' && this.renderer && !meta.iconLock) { this.render(); const c = document.createElement('canvas'); c.width = 160; c.height = 90; const src = this.renderer.domElement, k = Math.max(160 / src.width, 90 / src.height), w = src.width * k, h = src.height * k; c.getContext('2d').drawImage(src, (160 - w) / 2, (90 - h) / 2, w, h); icon = c.toDataURL('image/png').split(',')[1]; meta.icon = 'data:image/png;base64,' + icon; } } catch (e) { }
     saving = saving.then(() => writeWorld(meta, snap, icon)).catch(e => { console.error(e); if (!this.saveWarn || performance.now() - this.saveWarn > 30000) { this.saveWarn = performance.now(); UI.toast(L('Não foi possível salvar o mundo na pasta', 'Could not save the world to the folder')); } });
     return saving; };
   WS.flush = () => saving;
@@ -8416,35 +8466,103 @@ body.touch #actbtn.show{display:block}`;
     await FS.write(b + 'mundo.json', JSON.stringify({ formato: 1, jogo: 'VoxelMundo', meta: metaOnly(meta), estado: w.estado || {} }, null, 1));
     WS.cache.push(meta); return meta; };
 
-  // ---------- tela de mundos: miniatura, Exportar, Importar ----------
-  const st = document.createElement('style'); st.textContent = `#worldlist .world{display:flex;gap:10px;align-items:center}#worldlist .wico{width:96px;height:54px;flex:none;background:#000 center/cover;border:2px solid #000;image-rendering:auto}#worldlist .wtx{min-width:0;flex:1}#wsWhere{font-size:15px;color:#bbb;text-align:center;margin:4px 0}`;
+  // ---------- tela de mundos: lista com cartões (miniatura, nome, editar, excluir) ----------
+  const st = document.createElement('style'); st.textContent = `
+#worldlist{display:flex;flex-direction:column;gap:6px;padding:6px!important}
+#worldlist .world{display:flex;gap:12px;align-items:center;padding:6px;border:2px solid #000;background:rgba(0,0,0,.38);box-shadow:inset 0 0 0 2px rgba(255,255,255,.06);min-height:76px}
+#worldlist .world.on{border-color:#fff;background:rgba(255,255,255,.12);box-shadow:inset 0 0 0 2px rgba(255,255,255,.18)}
+#worldlist .wico{width:112px;height:63px;flex:none;background:#1a1410 center/cover;border:2px solid #000;image-rendering:pixelated;box-shadow:0 0 0 1px rgba(255,255,255,.15)}
+#worldlist .wtx{min-width:0;flex:1}#worldlist .wname{font-size:22px;color:#fff;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+#worldlist .winfo{font-size:15px;color:#bbb}#worldlist .wmode{display:inline-block;padding:0 6px;margin-right:6px;border:1px solid #000;color:#fff;font-size:14px}
+#worldlist .wact{display:flex;gap:6px;flex:none}
+.wbtn{width:46px;height:46px;padding:0;border:2px solid #000;cursor:pointer;background:#727272 center/30px 30px no-repeat;image-rendering:pixelated;box-shadow:inset 2px 2px 0 #a8a8a8,inset -2px -3px 0 #4a4a4a}
+.wbtn.red{background-color:#b8433a;box-shadow:inset 2px 2px 0 #e07a70,inset -2px -3px 0 #7a2620}
+.wbtn.prs,.wbtn:active{filter:brightness(.85)}
+#wsWhere{font-size:15px;color:#bbb;text-align:center;margin:4px 0}
+#s-worlds #worldlist{width:min(760px,calc(100vw - 160px));height:min(calc(100vh - 200px),480px)}#s-worlds .brow{width:min(760px,94vw)}
+@media (max-height:500px){#s-worlds #worldlist{height:calc(100vh - 150px)}#s-worlds h2{margin:4px 0}}
+@media (max-width:560px){#s-worlds #worldlist{width:94vw;height:calc(100vh - 250px)}#s-worlds h2{margin-top:72px}#worldlist .world{flex-wrap:wrap;gap:8px}#worldlist .wico{width:96px;height:54px}#worldlist .wtx{flex:1 1 140px}#worldlist .wact{width:100%;justify-content:flex-end}#s-worlds .brow{width:94vw}}
+#wsEdit .wbig{width:min(320px,70vw);aspect-ratio:16/9;background:#1a1410 center/cover;border:3px solid #000;image-rendering:pixelated;box-shadow:0 0 0 2px rgba(255,255,255,.15)}
+#wsEdit input{font:inherit;font-size:20px;background:#000;color:#fff;border:2px solid #a0a0a0;padding:6px 8px;min-width:0;flex:1}
+@media (max-height:500px){#worldlist .world{min-height:60px}#worldlist .wico{width:86px;height:48px}#worldlist .wname{font-size:19px}.wbtn{width:40px;height:40px}}`;
   document.head.appendChild(st);
-  const rws = UI.renderWorlds; UI.renderWorlds = function () { rws.apply(this, arguments); const ws = G.listWorlds(); const list = document.getElementById('worldlist');
-    [...list.querySelectorAll('.world')].forEach((d, i) => { const w = ws.slice().sort((a, b) => b.last - a.last)[i]; if (!w) return; const ic = document.createElement('div'); ic.className = 'wico'; if (w.icon) ic.style.backgroundImage = 'url(' + w.icon + ')'; const tx = document.createElement('div'); tx.className = 'wtx'; while (d.firstChild) tx.appendChild(d.firstChild); d.append(ic, tx); });
-    let wh = document.getElementById('wsWhere'); if (!wh) { wh = document.createElement('div'); wh.id = 'wsWhere'; wh.dataset.noi18n = '1'; list.after(wh); } wh.textContent = L('Mundos salvos em: ', 'Worlds saved in: ') + WS.where();
-    addFolderButton(); };
+  const PAL = { K: [30, 20, 12], W: [235, 235, 235], Y: [236, 188, 64], y: [196, 146, 40], O: [230, 120, 60], G: [150, 150, 150], g: [100, 100, 100], P: [250, 170, 190], w: [200, 200, 200] };
+  const PENCIL = () => fromRows(['................', '...........KK...', '..........KPPK..', '.........KYKPK..', '........KYYYK...', '.......KYYYK....', '......KYYYK.....', '.....KYYYK......', '....KYYYK.......', '...KyYYK........', '...KyyK.........', '..KWWK..........', '..KWK...........', '..KK............', '................', '................'], PAL).toDataURL();
+  const TRASH = () => fromRows(['................', '......KKKK......', '..KKKKWWWWKKKK..', '..KWWWWWWWWWWK..', '..KKKKKKKKKKKK..', '...KwWwWwWwWK...', '...KwWwWwWwWK...', '...KwWwWwWwWK...', '...KwWwWwWwWK...', '...KwWwWwWwWK...', '...KwWwWwWwWK...', '...KwWwWwWwWK...', '...KKKKKKKKKK...', '................', '................', '................'], PAL).toDataURL();
+  const PLAY = () => fromRows(['................', '................', '....KK..........', '....KWK.........', '....KWWK........', '....KWWWK.......', '....KWWWWK......', '....KWWWWWK.....', '....KWWWWK......', '....KWWWK.......', '....KWWK........', '....KWK.........', '....KK..........', '................', '................', '................'], PAL).toDataURL();
+  const ICONS = {}; const ic = (k, f) => ICONS[k] || (ICONS[k] = f());
+  const esc = t => String(t).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+  const MODEC = { survival: '#3f7d2c', creative: '#2f6aa8', hardcore: '#a33', spectator: '#666' };
+  const wbtn = (img, title, fn, red) => { const x = document.createElement('button'); x.className = 'wbtn' + (red ? ' red' : ''); x.title = title; x.style.backgroundImage = 'url(' + img + ')'; x.addEventListener('click', e => { e.stopPropagation(); Snd.play('click'); fn(); }); x.addEventListener('dblclick', e => e.stopPropagation()); return x; };
+  const askDelete = id => { UI.selWorld = id; UI.renderWorlds(); const b = document.getElementById('wDel'); if (b) b.click(); const w = G.listWorlds().find(x => x.id === id), msg = document.getElementById('delMsg'); if (w && msg) { msg.dataset.noi18n = '1'; msg.textContent = L('Excluir "' + w.name + '" para sempre?', 'Delete "' + w.name + '" forever?'); } };
+  UI.renderWorlds = function () {
+    const list = document.getElementById('worldlist'); if (!list) return; list.innerHTML = ''; const ws = G.listWorlds().slice().sort((a, b) => b.last - a.last);
+    if (!ws.length) list.innerHTML = '<div class="empty" style="text-align:center;color:#ccc;padding:20px">' + L('Nenhum mundo ainda. Crie um!', 'No worlds yet. Create one!') + '</div>';
+    const MN = { survival: L('Sobrevivência', 'Survival'), creative: L('Criativo', 'Creative'), hardcore: 'Hardcore', spectator: L('Espectador', 'Spectator') };
+    for (const w of ws) { const d = document.createElement('div'); d.className = 'world' + (this.selWorld === w.id ? ' on' : ''); d.dataset.noi18n = '1';
+      const icd = document.createElement('div'); icd.className = 'wico'; if (w.icon) icd.style.backgroundImage = 'url(' + w.icon + ')';
+      const tx = document.createElement('div'); tx.className = 'wtx'; const dt = new Date(w.last).toLocaleString(en() ? 'en-US' : 'pt-BR', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' });
+      tx.innerHTML = `<div class="wname">${esc(w.name)}</div><div class="winfo"><span class="wmode" style="background:${MODEC[w.mode] || '#555'}">${MN[w.mode] || esc(w.mode)}</span>${dt}</div>`;
+      const act = document.createElement('div'); act.className = 'wact';
+      act.append(wbtn(ic('play', PLAY), L('Jogar', 'Play'), () => G.loadWorld(w.id)), wbtn(ic('pen', PENCIL), L('Editar', 'Edit'), () => openEdit(w.id)), wbtn(ic('trash', TRASH), L('Excluir', 'Delete'), () => askDelete(w.id), true));
+      d.append(icd, tx, act);
+      d.addEventListener('click', () => { if (this.selWorld === w.id && touchOn && touchOn()) return G.loadWorld(w.id); this.selWorld = w.id; this.renderWorlds(); Snd.play('click'); });
+      d.addEventListener('dblclick', () => G.loadWorld(w.id)); list.appendChild(d); }
+    let wh = document.getElementById('wsWhere'); if (!wh) { wh = document.createElement('div'); wh.id = 'wsWhere'; wh.dataset.noi18n = '1'; list.after(wh); } wh.textContent = FS ? L('Mundos salvos em: ', 'Worlds saved in: ') + WS.where() : '';
+    fixButtons(); addFolderButton(); };
+  // botões de baixo: Jogar / Criar  ·  Importar / Voltar  (excluir agora fica em cada mundo; "excluir todos" na pasta)
+  function fixButtons() { const $i = id => document.getElementById(id), del = $i('wDel'), all = $i('wDelAll'), play = $i('wPlay'), nw = $i('wNew'), bk = $i('wBack');
+    for (const x of [del, all, play]) if (x) x.style.display = 'none';
+    if (nw && bk && bk.parentNode !== nw.parentNode) { nw.parentNode.appendChild(bk); }
+ }
+  function importPick() { const inp = document.createElement('input'); inp.type = 'file'; inp.accept = '.zip,application/zip'; inp.onchange = async () => { const f = inp.files[0]; if (!f) return; try { const m = await WS.importZip(f); UI.selWorld = m.id; UI.renderWorlds(); UI.toast(L('Mundo importado: ', 'World imported: ') + m.name); } catch (e) { console.error(e); UI.toast(L('Esse arquivo não é um mundo do VoxelMundo', 'This file is not a VoxelMundo world')); } }; inp.click(); }
+  async function saveMeta(m) { if (FS) { const mj = await FS.read(base(m) + 'mundo.json'); try { const w = JSON.parse(mj); w.meta = metaOnly(m); await FS.write(base(m) + 'mundo.json', JSON.stringify(w, null, 1)); } catch (e) { } }
+    else { try { const L2 = JSON.parse(localStorage.getItem('vm_worlds') || '[]'), o = L2.find(x => x.id === m.id); if (o) { Object.assign(o, metaOnly(m)); localStorage.setItem('vm_worlds', JSON.stringify(L2)); } } catch (e) { } } }
+  async function exportOne(m) { await WS.flush(); const r = await WS.exportZip(m.id); if (!r) return UI.toast(L('Não deu para exportar', 'Could not export'));
+    if (window.VMFS && VMFS.saveDownload) { const fr = new FileReader(); fr.onload = () => { const ok = VMFS.saveDownload(r.name, String(fr.result).split(',')[1]); UI.toast(ok ? L('Salvo em Downloads/VoxelMundo: ', 'Saved to Downloads/VoxelMundo: ') + r.name : L('Não deu para salvar', 'Could not save')); }; fr.readAsDataURL(r.blob); return; }
+    const a = document.createElement('a'); a.href = URL.createObjectURL(r.blob); a.download = r.name; document.body.appendChild(a); a.click(); setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 2000); }
+  async function duplicate(m) { await WS.flush(); const r = await WS.exportZip(m.id); if (!r) return; const n = await WS.importZip(new File([r.blob], r.name)); n.name = m.name + L(' (cópia)', ' (copy)'); await saveMeta(n); UI.selWorld = n.id; UI.renderWorlds(); UI.toast(L('Cópia criada', 'Copy created')); return n; }
+  // imagem escolhida do aparelho -> 320x180, fica fixa (não é trocada pela foto automática)
+  function pickImage(m, done) { const inp = document.createElement('input'); inp.type = 'file'; inp.accept = 'image/*'; inp.onchange = () => { const f = inp.files[0]; if (!f) return; const img = new Image(); img.onload = async () => { const c = document.createElement('canvas'); c.width = 320; c.height = 180; const k = Math.max(320 / img.width, 180 / img.height), w = img.width * k, h = img.height * k; c.getContext('2d').drawImage(img, (320 - w) / 2, (180 - h) / 2, w, h); const b64 = c.toDataURL('image/png').split(',')[1]; URL.revokeObjectURL(img.src);
+      m.icon = 'data:image/png;base64,' + b64; m.iconLock = true; if (FS) await FS.writeB64(base(m) + 'icone.png', b64); await saveMeta(m); UI.renderWorlds(); done && done(); UI.toast(L('Imagem trocada', 'Image changed')); }; img.src = URL.createObjectURL(f); }; inp.click(); }
+  // painel Editar mundo
+  function openEdit(id) { const m = WS.cache.find(x => x.id === id) || G.listWorlds().find(x => x.id === id); if (!m) return; UI.selWorld = id;
+    let p = document.getElementById('wsEdit'); if (!p) { p = document.createElement('div'); p.id = 'wsEdit'; p.style.cssText = 'position:fixed;inset:0;z-index:95;background:#2a1d14 var(--dirtbg);background-size:64px;image-rendering:pixelated;display:flex;align-items:center;justify-content:safe center;gap:16px;padding:10px 14px;overflow:auto'; document.body.appendChild(p); }
+    p.innerHTML = ''; p.style.display = 'flex'; p.dataset.noi18n = '1'; const wide = innerHeight < 500 && innerWidth > innerHeight; p.style.flexDirection = wide ? 'row' : 'column';
+    const left = document.createElement('div'); left.style.cssText = 'display:flex;flex-direction:column;align-items:center;gap:8px';
+    const h = document.createElement('h2'); h.style.margin = '0'; h.textContent = L('Editar mundo', 'Edit world');
+    const big = document.createElement('div'); big.className = 'wbig'; if (m.icon) big.style.backgroundImage = 'url(' + m.icon + ')'; if (wide) big.style.width = 'min(260px,36vw)';
+    const nr = document.createElement('div'); nr.style.cssText = 'display:flex;gap:6px;width:' + (wide ? 'min(300px,40vw)' : 'min(420px,86vw)'); const inp = document.createElement('input'); inp.value = m.name; inp.maxLength = 30; const ok = document.createElement('button'); ok.className = 'btn'; ok.textContent = L('Salvar', 'Save'); ok.style.width = 'auto'; ok.style.padding = '0 14px';
+    ok.onclick = async () => { Snd.play('click'); const n = inp.value.trim(); if (!n || n === m.name) return; m.name = n; await saveMeta(m); UI.renderWorlds(); UI.toast(L('Nome trocado', 'Renamed')); };
+    inp.addEventListener('keydown', e => { if (e.key === 'Enter') ok.click(); }); nr.append(inp, ok);
+    const info = document.createElement('div'); info.style.cssText = 'color:#bbb;font-size:15px;text-align:center'; info.textContent = (m.folder ? L('Pasta: ', 'Folder: ') + m.folder + ' · ' : '') + L('Semente: ', 'Seed: ') + m.seed;
+    left.append(h, big, nr, info);
+    const g = document.createElement('div'); g.style.cssText = 'display:grid;gap:8px;width:' + (wide ? 'min(380px,48vw)' : 'min(420px,86vw)');
+    const b = (txt, fn, red) => { const x = document.createElement('button'); x.className = 'btn' + (red ? ' red' : ''); x.textContent = txt; x.style.width = '100%'; x.onclick = () => { Snd.play('click'); fn(); }; g.appendChild(x); return x; };
+    b(L('Jogar', 'Play'), () => { p.style.display = 'none'; G.loadWorld(m.id); });
+    if (FS) { b(L('Exportar este mundo (.zip)', 'Export this world (.zip)'), () => exportOne(m)); b(L('Duplicar', 'Duplicate'), async () => { const n = await duplicate(m); if (n) openEdit(n.id); }); }
+    b(L('Escolher imagem...', 'Choose image...'), () => pickImage(m, () => openEdit(m.id)));
+    if (m.iconLock) b(L('Voltar para a foto automática', 'Back to automatic picture'), async () => { m.iconLock = false; await saveMeta(m); UI.toast(L('A foto muda na próxima vez que você jogar', 'The picture updates next time you play')); openEdit(m.id); });
+    b(L('Excluir mundo', 'Delete world'), () => { p.style.display = 'none'; askDelete(m.id); }, true);
+    b(L('Voltar', 'Back'), () => { p.style.display = 'none'; UI.renderWorlds(); });
+    p.append(left, g); if (window.fitButtons) requestAnimationFrame(fitButtons); }
+  WS.openEdit = openEdit;
   // ícone de pasta em pixel art (desenho próprio)
   const FOLDER = () => fromRows(['................', '................', '..KKKKK.........', '.KYYYYYK........', '.KYYYYYKKKKKKKK.', '.KYyyyyyyyyyyyK.', '.KYYYYYYYYYYYYK.', '.KYYYYYYYYYYYYK.', '.KYYYYYYYYYYYYK.', '.KYYYYYYYYYYYYK.', '.KYYYYYYYYYYYYK.', '.KyyyyyyyyyyyyK.', '.KKKKKKKKKKKKKK.', '................', '................', '................'], { K: [40, 28, 12], Y: [236, 188, 64], y: [196, 146, 40] }).toDataURL();
-  function addFolderButton() { if (!FS || document.getElementById('wsMgrBtn')) return; const b = document.createElement('button'); b.id = 'wsMgrBtn'; b.title = L('Gerenciar mundos', 'Manage worlds');
+  function addFolderButton() { if (document.getElementById('wsMgrBtn')) return; const b = document.createElement('button'); b.id = 'wsMgrBtn'; b.title = L('Gerenciar mundos', 'Manage worlds');
     b.style.cssText = `position:absolute;top:14px;right:16px;width:58px;height:58px;padding:0!important;min-height:0;background:#727272 url(${FOLDER()}) center/40px 40px no-repeat;image-rendering:pixelated;border:2px solid #000;box-shadow:inset 2px 2px 0 #a8a8a8,inset -2px -3px 0 #4a4a4a;cursor:pointer;z-index:5`;
     b.onclick = () => { Snd.play('click'); openManager(); }; document.getElementById('s-worlds').appendChild(b); }
-  // painel de gerenciar mundos: local, backup, importar, renomear, duplicar
-  function openManager() { let p = document.getElementById('wsMgr'); if (!p) { p = document.createElement('div'); p.id = 'wsMgr'; p.className = 'dirt'; p.style.cssText = 'position:fixed;inset:0;z-index:95;background:#2a1d14 var(--dirtbg);background-size:64px;image-rendering:pixelated;display:flex;flex-direction:column;align-items:center;justify-content:safe center;gap:8px;padding:10px 14px;overflow:auto'; document.body.appendChild(p); }
-    p.innerHTML = ''; p.style.display = 'flex'; const sel = WS.cache.find(m => m.id === UI.selWorld);
-    const h = document.createElement('h2'); h.textContent = L('Gerenciar mundos', 'Manage worlds'); const info = document.createElement('div'); info.style.cssText = 'color:#ddd;font-size:19px;text-align:center'; info.textContent = L('Salvos em: ', 'Saved in: ') + WS.where() + (sel ? ' · ' + L('Selecionado: ', 'Selected: ') + sel.name : '');
+  // painel da pasta: local, importar, backup de todos, excluir todos
+  function openManager() { let p = document.getElementById('wsMgr'); if (!p) { p = document.createElement('div'); p.id = 'wsMgr'; p.style.cssText = 'position:fixed;inset:0;z-index:95;background:#2a1d14 var(--dirtbg);background-size:64px;image-rendering:pixelated;display:flex;flex-direction:column;align-items:center;justify-content:safe center;gap:8px;padding:10px 14px;overflow:auto'; document.body.appendChild(p); }
+    p.innerHTML = ''; p.style.display = 'flex'; p.dataset.noi18n = '1'; const ws = G.listWorlds();
+    const h = document.createElement('h2'); h.textContent = L('Pasta de mundos', 'World folder'); const info = document.createElement('div'); info.style.cssText = 'color:#ddd;font-size:19px;text-align:center'; info.textContent = (FS ? L('Salvos em: ', 'Saved in: ') + WS.where() + ' · ' : '') + ws.length + L(ws.length === 1 ? ' mundo' : ' mundos', ws.length === 1 ? ' world' : ' worlds');
     const g = document.createElement('div'); const wide = innerHeight < 500 && innerWidth > innerHeight; g.style.cssText = 'display:grid;gap:8px;' + (wide ? 'grid-template-columns:1fr 1fr;width:min(760px,94vw)' : 'width:min(420px,86vw)'); if (wide) { h.style.margin = '0'; info.style.fontSize = '16px'; }
     p.append(h, info, g);
     const b = (txt, fn, red) => { const x = document.createElement('button'); x.className = 'btn' + (red ? ' red' : ''); x.textContent = txt; x.style.width = '100%'; x.onclick = () => { Snd.play('click'); fn(); }; g.appendChild(x); return x; };
-    const need = () => { if (!sel) { UI.toast(L('Selecione um mundo na lista primeiro', 'Select a world in the list first')); return false; } return true; };
-    b(L('Fazer backup (.zip)', 'Back up world (.zip)'), async () => { if (!need()) return; await WS.flush(); const r = await WS.exportZip(sel.id); if (!r) return UI.toast(L('Não deu para exportar', 'Could not export'));
-      if (window.VMFS && VMFS.saveDownload) { const fr = new FileReader(); fr.onload = () => { const ok = VMFS.saveDownload(r.name, String(fr.result).split(',')[1]); UI.toast(ok ? L('Salvo em Downloads/VoxelMundo: ', 'Saved to Downloads/VoxelMundo: ') + r.name : L('Não deu para salvar', 'Could not save')); }; fr.readAsDataURL(r.blob); return; }
-      const a = document.createElement('a'); a.href = URL.createObjectURL(r.blob); a.download = r.name; document.body.appendChild(a); a.click(); setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 2000); });
-    b(L('Importar mundo (.zip)', 'Import world (.zip)'), () => { const inp = document.createElement('input'); inp.type = 'file'; inp.accept = '.zip,application/zip'; inp.onchange = async () => { const f = inp.files[0]; if (!f) return; try { const m = await WS.importZip(f); UI.selWorld = m.id; UI.renderWorlds(); UI.toast(L('Mundo importado: ', 'World imported: ') + m.name); openManager(); } catch (e) { console.error(e); UI.toast(L('Esse arquivo não é um mundo do VoxelMundo', 'This file is not a VoxelMundo world')); } }; inp.click(); });
-    b(L('Renomear', 'Rename'), () => { if (!need()) return; const row = document.createElement('div'); row.style.cssText = 'display:flex;gap:6px;width:min(420px,86vw)'; const inp = document.createElement('input'); inp.value = sel.name; inp.maxLength = 30; inp.style.cssText = 'flex:1;font:inherit;font-size:20px;background:#000;color:#fff;border:2px solid #a0a0a0;padding:4px 8px';
-      const ok = document.createElement('button'); ok.className = 'btn'; ok.textContent = 'OK'; ok.style.width = '90px'; ok.onclick = async () => { const n = inp.value.trim(); if (!n) return; sel.name = n; const mj = await FS.read(base(sel) + 'mundo.json'); try { const w = JSON.parse(mj); w.meta = metaOnly(sel); await FS.write(base(sel) + 'mundo.json', JSON.stringify(w, null, 1)); } catch (e) { } UI.renderWorlds(); openManager(); UI.toast(L('Nome trocado', 'Renamed')); };
-      row.append(inp, ok); p.insertBefore(row, g); inp.focus(); });
-    b(L('Duplicar', 'Duplicate'), async () => { if (!need()) return; await WS.flush(); const r = await WS.exportZip(sel.id); if (!r) return; const m = await WS.importZip(new File([r.blob], r.name)); m.name = sel.name + L(' (cópia)', ' (copy)'); const mj = await FS.read(base(m) + 'mundo.json'); try { const w = JSON.parse(mj); w.meta = metaOnly(m); await FS.write(base(m) + 'mundo.json', JSON.stringify(w, null, 1)); } catch (e) { } UI.renderWorlds(); UI.toast(L('Cópia criada', 'Copy created')); openManager(); });
+    if (FS) { b(L('Importar mundo (.zip)', 'Import world (.zip)'), () => { p.style.display = 'none'; importPick(); });
+      b(L('Backup de todos os mundos', 'Back up all worlds'), async () => { if (!ws.length) return; for (const m of WS.cache) await exportOne(m); }); }
     if (window.VMFS && window.openWorldLocation) b(L('Mudar o local dos mundos...', 'Change world location...'), () => { p.style.display = 'none'; openWorldLocation(); });
+    if (ws.length) b(L('Excluir todos os mundos', 'Delete all worlds'), () => { p.style.display = 'none'; const a = document.getElementById('wDelAll'); if (a) a.click(); }, true);
     const bk = b(L('Voltar', 'Back'), () => { p.style.display = 'none'; }); bk.style.gridColumn = '1 / -1'; const acts = g.children.length - 1; if (wide && acts % 2) g.children[acts - 1].style.gridColumn = '1 / -1';
     if (window.fitButtons) requestAnimationFrame(fitButtons); }
   WS.openManager = openManager;
@@ -8507,6 +8625,34 @@ input:focus-visible{box-shadow:0 0 0 2px #8f8}`;
   // trocar de app/aba ou perder o foco solta tudo que estava apertado
   const releaseAll = () => { for (const el of held.values()) el.classList.remove('prs'); held.clear(); document.querySelectorAll('#touchui .on').forEach(el => { if (el.id !== 'bSneak' || !G.touchSneak) el.classList.remove('on'); }); };
   window.addEventListener('blur', releaseAll); document.addEventListener('visibilitychange', () => { if (document.hidden) releaseAll(); });
+})();
+
+// ================= MUDA CRESCE COM A MESMA FORMA DAS ÁRVORES DO MUNDO =================
+(function () {
+  const old = window.growTree;
+  const api = w => ({
+    get: (x, y, z) => w.getBlock(x, y, z),
+    log: (x, y, z, id) => { const c = w.getBlock(x, y, z); if (!c || BL[c].replace || SAPLINGS[c] !== undefined || /leaves/.test(BL[c].key) || !SOLID[c]) w.setBlock(x, y, z, id); },
+    leaf: (x, y, z, id) => { const c = w.getBlock(x, y, z); if (!c || (BL[c].replace && !LIQT[c])) w.setBlock(x, y, z, id); },
+    r: Math.random
+  });
+  // acha um quadrado 2x2 de mudas iguais que inclua (x,z); devolve o canto de menor x/z
+  function square(w, x, y, z, sapId) {
+    for (const [ox, oz] of [[0, 0], [-1, 0], [0, -1], [-1, -1]]) { const cx = x + ox, cz = z + oz; let ok = true;
+      for (const [dx, dz] of [[0, 0], [1, 0], [0, 1], [1, 1]]) { const X = cx + dx, Z = cz + dz; if (X === x && Z === z) continue; if (w.getBlock(X, y, Z) !== sapId) { ok = false; break; } }
+      if (ok) return [cx, cz]; }
+    return null;
+  }
+  window.growTree = function (w, x, y, z, kind) {
+    const t = api(w);
+    if (kind === 'oak') return Math.random() < 0.1 ? TREES.fancyOak(t, x, y, z) : TREES.oak(t, x, y, z);
+    if (kind === 'birch') return TREES.birch(t, x, y, z, { tall: Math.random() < 0.1 });
+    if (kind === 'spruce') { const sq = square(w, x, y, z, BID.spruce_sapling);
+      if (sq) { for (const [dx, dz] of [[0, 0], [1, 0], [0, 1], [1, 1]]) if (w.getBlock(sq[0] + dx, y, sq[1] + dz) === BID.spruce_sapling) w.setBlock(sq[0] + dx, y, sq[1] + dz, 0); return TREES.megaSpruce(t, sq[0], y, sq[1]); }
+      return TREES.spruce(t, x, y, z); }
+    return old(w, x, y, z, kind);
+  };
+  TREE_SPACE.oak = 5; TREE_SPACE.spruce = 7;
 })();
 
 // ===== REGRAS GLOBAIS DE INTERFACE: cara de jogo, não de site =====
