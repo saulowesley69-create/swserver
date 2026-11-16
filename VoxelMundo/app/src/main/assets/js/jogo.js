@@ -1263,6 +1263,9 @@ function blockBoxes(id, X, Y, Z, phys, world) {
     case 'slab': return bd && bd.top ? [[0, 0.5, 0, 1, 1, 1]] : [[0, 0, 0, 1, 0.5, 1]];
     case 'stairs': { const f = bd && bd.f !== undefined ? bd.f : 0, top = bd && bd.top; const lo = top ? [0, 0.5, 0, 1, 1, 1] : [0, 0, 0, 1, 0.5, 1], y0 = top ? 0 : 0.5, y1 = top ? 0.5 : 1;
       const hi = f === 0 ? [0.5, y0, 0, 1, y1, 1] : f === 1 ? [0, y0, 0, 0.5, y1, 1] : f === 2 ? [0, y0, 0.5, 1, y1, 1] : [0, y0, 0, 1, y1, 0.5]; return [lo, hi]; }
+    case 'pane': { const P0 = 7 / 16, P1 = 9 / 16; const con = (dx, dz) => { const n = w ? w.getBlock(X + dx, Y, Z + dz) : 0, nb = BL[n]; return !!nb && (nb.boxes === 'pane' || n === BID.glass || n === 244 || (OPAQ[n] && SOLID[n] && !nb.boxes && !nb.shape)); };
+      const c = [con(1, 0), con(-1, 0), con(0, 1), con(0, -1)], out = [[P0, 0, P0, P1, 1, P1]];
+      if (c[0]) out.push([P1, 0, P0, 1, 1, P1]); if (c[1]) out.push([0, 0, P0, P0, 1, P1]); if (c[2]) out.push([P0, 0, P1, P1, 1, 1]); if (c[3]) out.push([P0, 0, 0, P1, 1, P0]); return out; }
     case 'fence': case 'wall': {
       const wall = b.boxes === 'wall', P0 = wall ? 0.25 : 0.375, P1 = 1 - P0, A0 = wall ? 0.3125 : 0.4375, A1 = 1 - A0, H = phys ? 1.75 : 1;
       const con = (dx, dz) => { const n = w ? w.getBlock(X + dx, Y, Z + dz) : 0, nb = BL[n]; return !!nb && (nb.boxes === 'fence' || nb.boxes === 'wall' || nb.boxes === 'gate' || (OPAQ[n] && SOLID[n] && !nb.boxes && !nb.shape)); };
@@ -1282,14 +1285,14 @@ function blockBoxes(id, X, Y, Z, phys, world) {
   return [[0, 0, 0, 1, 1, 1]];
 }
 // desenha caixas com textura recortada (sem esticar) — usado pelo mesher, ícones e itens no chão
-function emitBoxes(A, boxes, ox, oy, oz, tex, sky, bl, cull, scale, cullAll) {
+function emitBoxes(A, boxes, ox, oy, oz, tex, sky, bl, cull, scale, cullAll, tint) {
   const S = scale || 1, verts = [[0, 0, 0], [0, 0, 0], [0, 0, 0], [0, 0, 0]], uvs = [[0, 0], [0, 0], [0, 0], [0, 0]], cols = [0, 0, 0, 0];
   for (const bx of boxes) for (let f = 0; f < 6; f++) {
     const F = FACES[f]; const ax = F.d[0] ? 0 : F.d[1] ? 1 : 2, pos = F.d[ax] > 0; if (cull && (cullAll || (pos ? bx[ax + 3] >= 1 : bx[ax] <= 0)) && cull(f)) continue;
     const t = F.t === 'top' ? tex.top : F.t === 'bottom' ? tex.bottom : tex.side;
     for (let k = 0; k < 4; k++) { const c = F.c[k]; const X = bx[0] + c[0] * (bx[3] - bx[0]), Y = bx[1] + c[1] * (bx[4] - bx[1]), Z = bx[2] + c[2] * (bx[5] - bx[2]);
       verts[k] = [ox + X * S, oy + Y * S, oz + Z * S]; const u = ax === 0 ? Z : X, v = ax === 1 ? Z : Y; uvs[k] = tileUV(t, u, v); cols[k] = F.s; }
-    pushQuad(A, verts, uvs, cols, sky, bl, false);
+    pushQuad(A, verts, uvs, cols, sky, bl, false, tint || null);
   }
 }
 (function () {
@@ -1756,6 +1759,46 @@ window.TREES = (function () {
   window.SUNFLOWER = [241, 242];
 })();
 
+// ================= VIDRO: vidro fino (painel), vidro colorido (16 cores) e painel colorido =================
+// Os coloridos são UM bloco cada (vidro colorido e painel colorido); a cor fica guardada no próprio bloco (estado 1..16),
+// do mesmo jeito que o tronco deitado guarda o eixo. No inventário cada cor é um item.
+(function () {
+  window.GLASS_COLORS = [
+    ['white', 'Branco', 'White', [249, 255, 254], 'bone_meal'], ['orange', 'Laranja', 'Orange', [249, 128, 29], 'orange_tulip'],
+    ['magenta', 'Magenta', 'Magenta', [199, 78, 189], 'allium'], ['light_blue', 'Azul-claro', 'Light Blue', [58, 179, 218], 'cornflower'],
+    ['yellow', 'Amarelo', 'Yellow', [254, 216, 61], 'dandelion'], ['lime', 'Verde-limão', 'Lime', [128, 199, 31], 'slimeball'],
+    ['pink', 'Rosa', 'Pink', [243, 139, 170], 'pink_petals'], ['gray', 'Cinza', 'Gray', [71, 79, 82], 'gravel'],
+    ['light_gray', 'Cinza-claro', 'Light Gray', [157, 157, 151], 'oxeye_daisy'], ['cyan', 'Ciano', 'Cyan', [22, 156, 156], 'copper_ingot'],
+    ['purple', 'Roxo', 'Purple', [137, 50, 184], 'void_prism'], ['blue', 'Azul', 'Blue', [60, 68, 170], 'lapis'],
+    ['brown', 'Marrom', 'Brown', [131, 84, 50], 'dirt'], ['green', 'Verde', 'Green', [94, 124, 22], 'cactus'],
+    ['red', 'Vermelho', 'Red', [176, 46, 38], 'poppy'], ['black', 'Preto', 'Black', [29, 29, 33], 'coal']];
+  window.GLASS_TINT = GLASS_COLORS.map(c => c[3].map(v => Math.max(0.12, v / 255)));
+  // vidro colorido: claro e meio transparente (a cor vem do bloco)
+  retile('stained_glass', (px, r) => { for (let y = 0; y < 16; y++) for (let x = 0; x < 16; x++) { const edge = x === 0 || y === 0 || x === 15 || y === 15; let a = edge ? 215 : 120, v = edge ? 238 : 255;
+    if (!edge && ((x === y + 3 && x < 8) || (x === y - 4 && x > 6 && x < 12) || (x + 1 === y + 3 && x < 7))) { a = 170; v = 255; } if (!edge && r() < 0.08) a -= 18; px(x, y, [v, v, v, a]); } });
+  const add = (id, key, name, o) => { const b = defBlock(id, key, name, o); OPAQ[id] = 0; SOLID[id] = b.solid === false ? 0 : 1; return b; };
+  add(243, 'glass_pane', 'Painel de Vidro', { opaque: false, shape: 'box', boxes: 'pane', hard: 0.3, drop: 0, snd: 'glass', t: 'glass' });
+  add(244, 'stained_glass', 'Vidro Colorido', { opaque: false, translucent: true, hard: 0.3, drop: 0, snd: 'glass', t: 'stained_glass', creative: false });
+  add(245, 'stained_glass_pane', 'Painel de Vidro Colorido', { opaque: false, translucent: true, shape: 'box', boxes: 'pane', hard: 0.3, drop: 0, snd: 'glass', t: 'stained_glass', creative: false });
+  defItem(243, 'glass_pane', 'Painel de Vidro', { block: 243, cat: 'blocks' });
+  const EN0 = typeof EN !== 'undefined' ? EN : null; if (EN0) EN0.glass_pane = 'Glass Pane';
+  shaped(['GGG', 'GGG'], { G: 'glass' }, 'glass_pane', 16);
+  // ícone: o desenho do vidro pintado com a cor
+  const tinted = (st, pane) => () => { const c = document.createElement('canvas'); c.width = c.height = 32; const g = c.getContext('2d'); g.imageSmoothingEnabled = false; const t = T.stained_glass, [R, G2, B] = GLASS_COLORS[st - 1][3];
+    const tmp = document.createElement('canvas'); tmp.width = tmp.height = 16; const tg = tmp.getContext('2d'); tg.drawImage(atlasCanvas, (t % 16) * 16, Math.floor(t / 16) * 16, 16, 16, 0, 0, 16, 16);
+    const d = tg.getImageData(0, 0, 16, 16); for (let i = 0; i < d.data.length; i += 4) { d.data[i] = d.data[i] * R / 255; d.data[i + 1] = d.data[i + 1] * G2 / 255; d.data[i + 2] = d.data[i + 2] * B / 255; d.data[i + 3] = Math.min(255, d.data[i + 3] * 1.6); } tg.putImageData(d, 0, 0);
+    if (pane) g.drawImage(tmp, 6, 0, 4, 16, 12, 0, 8, 32); else g.drawImage(tmp, 0, 0, 32, 32); return c; };
+  let iid = Math.max(462, IT.length);
+  GLASS_COLORS.forEach(([k, pt, en, , ing], i) => { const st = i + 1, gk = k + '_stained_glass', pk = k + '_stained_glass_pane';
+    defItem(iid++, gk, 'Vidro ' + pt, { block: 244, st, cat: 'blocks', icon: tinted(st, false) });
+    defItem(iid++, pk, 'Painel de Vidro ' + pt, { block: 245, st, cat: 'blocks', icon: tinted(st, true) });
+    if (EN0) { EN0[gk] = en + ' Stained Glass'; EN0[pk] = en + ' Stained Glass Pane'; }
+    if (IID[ing] !== undefined) { shaped(['GGG', 'GDG', 'GGG'], { G: 'glass', D: ing }, gk, 8); shaped(['GGG', 'GDG', 'GGG'], { G: 'glass_pane', D: ing }, pk, 8); }
+    shaped(['GGG', 'GGG'], { G: gk }, pk, 16); });
+  // item colorido de cada bloco+estado (para pegar o bloco certo)
+  window.GLASS_ITEM = { 244: GLASS_COLORS.map(c => IID[c[0] + '_stained_glass']), 245: GLASS_COLORS.map(c => IID[c[0] + '_stained_glass_pane']) };
+})();
+
 // ================= MUNDO =================
 const CS = 16, WH = 160, NH = 96, SEA = 40;
 const ckey = (cx, cz) => cx + ',' + cz;
@@ -2120,7 +2163,8 @@ class World {
 // ================= MESHER =================
 function liqH(id, above) { if (LIQT[above] === LIQT[id]) return 1; const l = LVL[id]; if (l === 0 || l === 8) return 0.875; return Math.max(0.12, (8 - l) / 9); }
 // troncos deitados: o mesmo bloco, só guarda o eixo (1 = ao longo de X, 2 = ao longo de Z). Nas mudanças salvas fica id + 256*eixo.
-const AXIAL = new Uint8Array(256); for (const b of BL) if (b && /^(log|.+_log|crimson_stem|warped_stem|hay|basalt|void_pillar)$/.test(b.key)) AXIAL[b.id] = 1;
+const AXIAL = new Uint8Array(256), LOGAX = new Uint8Array(256); for (const b of BL) if (b && /^(log|.+_log|crimson_stem|warped_stem|hay|basalt|void_pillar)$/.test(b.key)) AXIAL[b.id] = LOGAX[b.id] = 1;
+for (const k of ['stained_glass', 'stained_glass_pane']) if (BID[k] !== undefined) AXIAL[BID[k]] = 1; // estado = cor (1..16)
 function applyMods(c, m) { const d = c.data; for (const i in m) { const v = m[i]; d[i] = v; if (c.ax) c.ax.delete(+i); if (v > 255) (c.ax || (c.ax = new Map())).set(+i, v >> 8); } }
 const FACES = [
   { d: [0, 1, 0], c: [[0, 1, 0], [0, 1, 1], [1, 1, 1], [1, 1, 0]], t: 'top', s: 1.0 },
@@ -2177,7 +2221,7 @@ function meshChunk(world, ch) {
   const blkL = (x, y, z) => { let m = 0; for (let k = 0; k < lights.length; k++) { const L = lights[k]; const v = L[3] - (Math.abs(x - L[0]) + Math.abs(y - L[1]) + Math.abs(z - L[2])); if (v > m) m = v; } return m / 15; };
   LCS.fill(-1); const skv = [0, 0, 0, 0], blv = [0, 0, 0, 0];
   const cl = (x, y, z) => { const i = y < -1 || y > WH ? 0 : ((y + 1) * 18 + (z + 1)) * 18 + (x + 1); if (LCS[i] < 0) { LCS[i] = skyL(x, y, z); LCB[i] = lights.length ? blkL(x, y, z) : 0; } return i; };
-  const S_ = newBuf(), W_ = newBuf(); const fancy = S.fancyLeaves; const ICE = B_('ice');
+  const S_ = newBuf(), W_ = newBuf(), G_ = newBuf(); const fancy = S.fancyLeaves; const ICE = B_('ice');
   let maxY = ch.maxY; for (let i = 0; i < 9; i++) if (nb[i] && nb[i].maxY > maxY) maxY = nb[i].maxY; maxY = Math.min(WH - 1, maxY + 1);
   const verts = [[0, 0, 0], [0, 0, 0], [0, 0, 0], [0, 0, 0]], uvs = [[0, 0], [0, 0], [0, 0], [0, 0]], cols = [0, 0, 0, 0];
   for (let y = 0; y <= Math.min(ch.maxY, WH - 1); y++) for (let z = 0; z < 16; z++) for (let x = 0; x < 16; x++) {
@@ -2235,7 +2279,8 @@ function meshChunk(world, ch) {
     if (b.boxes) {
       const sky = skyL(x, y, z), bl = lights.length ? blkL(x, y, z) : 0;
       if (b.boxes === 'rail') { const rs = railShape(world, ch.cx * 16 + x, y, ch.cz * 16 + z, id); if (rs.asc) { emitRailSlope(S_, x, y, z, rs, Math.max(sky, skyL(x, y + 1, z)), Math.max(bl, lights.length ? blkL(x, y + 1, z) : 0)); continue; } }
-      emitBoxes(S_, blockBoxes(id, ch.cx * 16 + x, y, ch.cz * 16 + z, false, world), x, y, z, b.boxes === 'rail' ? railTex(world, ch.cx * 16 + x, y, ch.cz * 16 + z, id) : b.tex, sky, bl, f => { const F = FACES[f], n = get(x + F.d[0], y + F.d[1], z + F.d[2]); return OPAQ[n] && !BL[n].boxes; });
+      const pst = b.boxes === 'pane' && AXIAL[id] && ch.ax ? (ch.ax.get((y * 16 + z) * 16 + x) || 0) : 0;
+      emitBoxes(b.translucent ? G_ : S_, blockBoxes(id, ch.cx * 16 + x, y, ch.cz * 16 + z, false, world), x, y, z, b.boxes === 'rail' ? railTex(world, ch.cx * 16 + x, y, ch.cz * 16 + z, id) : b.tex, sky, bl, f => { const F = FACES[f], n = get(x + F.d[0], y + F.d[1], z + F.d[2]); return OPAQ[n] && !BL[n].boxes; }, 1, false, pst && window.GLASS_TINT ? GLASS_TINT[pst - 1] : null);
       continue;
     }
     if (b.shape === 'bed') {
@@ -2253,8 +2298,8 @@ function meshChunk(world, ch) {
       for (let f = 0; f < 6; f++) { const F = FACES[f]; if (b.shape === 'bed' && f === 1 && OPAQ[get(x, y - 1, z)]) continue; const t = F.t === 'top' ? tx.top : F.t === 'bottom' ? tx.bottom : tx.side; for (let k = 0; k < 4; k++) { const c = F.c[k]; verts[k] = [x + mn[0] + c[0] * (mx[0] - mn[0]), y + mn[1] + c[1] * (mx[1] - mn[1]), z + mn[2] + c[2] * (mx[2] - mn[2])]; uvs[k] = tileUV(t, FUV[k][0], f > 1 ? mn[1] + c[1] * (mx[1] - mn[1]) : FUV[k][1]); cols[k] = F.s; } pushQuad(S_, verts, uvs, cols, sky, bl, false); }
       continue;
     }
-    const A = b.translucent ? W_ : S_;
-    const axv = AXIAL[id] && ch.ax ? (ch.ax.get((y * 16 + z) * 16 + x) || 0) : 0;
+    const A = b.translucent ? (b.liquid || b.portal ? W_ : G_) : S_; // gelo e vidro colorido: camada própria, desenhada depois da água
+    const stv = AXIAL[id] && ch.ax ? (ch.ax.get((y * 16 + z) * 16 + x) || 0) : 0, axv = LOGAX[id] ? stv : 0, gtint = !LOGAX[id] && stv && window.GLASS_TINT ? GLASS_TINT[stv - 1] : null;
     let facing = -1; if (b.facing) { const bd = world.bdata[(ch.cx * 16 + x) + ',' + y + ',' + (ch.cz * 16 + z)]; facing = bd && bd.f !== undefined ? bd.f : 5; }
     for (let f = 0; f < 6; f++) {
       const F = FACES[f]; const nx = x + F.d[0], ny = y + F.d[1], nz = z + F.d[2]; const n = get(nx, ny, nz);
@@ -2272,10 +2317,10 @@ function meshChunk(world, ch) {
         { let ss = LCS[i0], bb = LCB[i0], n = 1, j; if (!s1) { j = cl(x + o[0][0], y + o[0][1], z + o[0][2]); ss += LCS[j]; bb += LCB[j]; n++; } if (!s2) { j = cl(x + o[1][0], y + o[1][1], z + o[1][2]); ss += LCS[j]; bb += LCB[j]; n++; } if (!cc && !(s1 && s2)) { j = cl(x + o[2][0], y + o[2][1], z + o[2][2]); ss += LCS[j]; bb += LCB[j]; n++; } skv[k] = ss / n; blv[k] = bb / n; }
         const c = F.c[k]; verts[k] = [x + c[0], y + c[1], z + c[2]]; uvs[k] = rot ? tileUV(t, FUV[k][1], 1 - FUV[k][0]) : tileUV(t, FUV[k][0], FUV[k][1]); cols[k] = F.s * AO_L[ao[k]];
       }
-      pushQuad(A, verts, uvs, cols, skv, blv, ao[0] + ao[2] < ao[1] + ao[3], ch.bio && (b.tint || (id === GRASS_ID && f === 0)) ? BIOME_TINT[ch.bio[z * 16 + x]] : null);
+      pushQuad(A, verts, uvs, cols, skv, blv, ao[0] + ao[2] < ao[1] + ao[3], gtint || (ch.bio && (b.tint || (id === GRASS_ID && f === 0)) ? BIOME_TINT[ch.bio[z * 16 + x]] : null));
     }
   }
-  return { solid: bufToGeo(S_), water: bufToGeo(W_) };
+  return { solid: bufToGeo(S_), water: bufToGeo(W_), glass: bufToGeo(G_) };
 }
 // cubo de bloco individual (mão, itens no chão, TNT)
 function blockCubeGeo(id, size = 1) {
@@ -4527,7 +4572,7 @@ const G = {
     const sc = this.scene = new THREE.Scene(); sc.fog = new THREE.Fog(0x9cc4ff, 30, 80); sc.background = new THREE.Color(0x9cc4ff);
     const cam = this.camera = new THREE.PerspectiveCamera(S.fov, innerWidth / innerHeight, 0.05, 1200); cam.rotation.order = 'YXZ'; sc.add(cam);
     const at = this.atlasTex = new THREE.CanvasTexture(atlasCanvas); at.magFilter = THREE.NearestFilter; at.minFilter = THREE.NearestFilter; at.generateMipmaps = false;
-    this.matSolid = terrainMat({ alphaTest: 0.5 }); this.matWater = terrainMat({ transparent: true, opacity: 0.78, depthWrite: false });
+    this.matSolid = terrainMat({ alphaTest: 0.5 }); this.matWater = terrainMat({ transparent: true, opacity: 0.78, depthWrite: false }); this.matGlass = terrainMat({ transparent: true, opacity: 1, depthWrite: true });
     this.amb = new THREE.AmbientLight(0xffffff, 0.6); this.sunL = new THREE.DirectionalLight(0xffffff, 0.5); sc.add(this.amb, this.sunL, this.sunL.target);
     // céu
     this.sky = new THREE.Group(); sc.add(this.sky);
@@ -4849,7 +4894,7 @@ const G = {
     return best || { x: 0.5, y: WH - 10, z: 0.5 };
   },
   // ---------- CHUNKS ----------
-  disposeChunk(c) { for (const k of ['mesh', 'wmesh']) if (c[k]) { this.scene.remove(c[k]); c[k].geometry.dispose(); c[k] = null; } },
+  disposeChunk(c) { for (const k of ['mesh', 'wmesh', 'gmesh']) if (c[k]) { this.scene.remove(c[k]); c[k].geometry.dispose(); c[k] = null; } },
   hasNeighbors(c) { for (let dx = -1; dx <= 1; dx++) for (let dz = -1; dz <= 1; dz++) if (!this.world.chunks.has(ckey(c.cx + dx, c.cz + dz))) return false; return true; },
   updateChunks(budget) {
     const w = this.world, p = this.player; const pcx = Math.floor(p.pos.x) >> 4, pcz = Math.floor(p.pos.z) >> 4; const R = S.renderDist;
@@ -4872,6 +4917,7 @@ const G = {
       c.dirty = false; const g = meshChunk(w, c); this.disposeChunk(c);
       if (g.solid) { c.mesh = new THREE.Mesh(g.solid, this.matSolid); c.mesh.position.set(c.cx * 16, 0, c.cz * 16); this.scene.add(c.mesh); }
       if (g.water) { c.wmesh = new THREE.Mesh(g.water, this.matWater); c.wmesh.position.set(c.cx * 16, 0, c.cz * 16); c.wmesh.renderOrder = 1; this.scene.add(c.wmesh); }
+      if (g.glass) { c.gmesh = new THREE.Mesh(g.glass, this.matGlass); c.gmesh.position.set(c.cx * 16, 0, c.cz * 16); c.gmesh.renderOrder = 2; this.scene.add(c.gmesh); }
       c.meshed = true;
     }
   },
@@ -5178,7 +5224,7 @@ const G = {
       if (nb.shape === 'door' && (y + 1 >= WH || w.getBlock(x, y + 1, z))) return;
       let bedDir = null;
       if (nb.shape === 'bed') { const fx = -Math.sin(p.yaw), fz = -Math.cos(p.yaw); bedDir = Math.abs(fx) > Math.abs(fz) ? (fx > 0 ? 0 : 1) : (fz > 0 ? 2 : 3); const D = BED_DIRS[bedDir], hc = w.getBlock(x + D[0], y, z + D[1]); if (hc && !BL[hc].replace) { UI.toast('A cama precisa de 2 blocos livres.'); return; } }
-      w.setBlock(x, y, z, bedDir !== null ? BID.bed_foot : it.block, { ax: AXIAL[it.block] && t.n[1] === 0 ? (t.n[0] ? 1 : 2) : 0 });
+      w.setBlock(x, y, z, bedDir !== null ? BID.bed_foot : it.block, { ax: it.st ? it.st : LOGAX[it.block] && t.n[1] === 0 ? (t.n[0] ? 1 : 2) : 0 });
       if (nb.torch && t.n[1] === 0 && SOLID[t.id] && !BL[t.id].replace) { w.bdata[x + ',' + y + ',' + z] = { tw: [-t.n[0], -t.n[2]] }; w.markDirty(x >> 4, z >> 4); }
       if (nb.shape === 'panel' && t.n[1] === 0) { w.bdata[x + ',' + y + ',' + z] = { f: t.n[0] === -1 ? 0 : t.n[0] === 1 ? 1 : t.n[2] === -1 ? 2 : 3 }; w.markDirty(x >> 4, z >> 4); }
       if (bedDir !== null) { const D = BED_DIRS[bedDir]; w.bdata[x + ',' + y + ',' + z] = { f: bedDir }; w.setBlock(x + D[0], y, z + D[1], BID.bed, { noUpdate: true }); w.bdata[(x + D[0]) + ',' + y + ',' + (z + D[1])] = { f: bedDir }; w.markDirty(x >> 4, z >> 4); w.markDirty((x + D[0]) >> 4, (z + D[1]) >> 4); }
@@ -7289,6 +7335,7 @@ MOB_CLASS.villager = function (x, y, z) { return new Villager(x, y, z, Math.floo
   // ---------- canal de mensagens (com mensagens grandes em pedaços) ----------
   function send(peer, o) { if (!peer || !peer.open) return; try { const s = JSON.stringify(o); if (s.length < 60000) peer.dc.send(s); else { const id = Math.random().toString(36).slice(2), n = Math.ceil(s.length / 60000); for (let i = 0; i < n; i++) peer.dc.send(JSON.stringify({ t: '~', id, i, n, s: s.slice(i * 60000, (i + 1) * 60000) })); } } catch (e) { } }
   const toAll = (o, except) => { for (const p of NET.peers) if (p !== except) send(p, o); };
+  const envMsg = () => ({ t: 'env', time: G.time, day: G.day, r: !!G.raining, th: !!G.thundering, cm: !!NET.guestCmds && !!G.cheats, diff: G.difficulty, pvp: pvpOn() });
   function wire(peer) {
     const dc = peer.dc; dc.binaryType = 'arraybuffer'; peer.parts = {};
     dc.onopen = () => { peer.open = true; onOpen(peer); };
@@ -7426,7 +7473,7 @@ MOB_CLASS.villager = function (x, y, z) { return new Villager(x, y, z, Math.floo
     const me = G.player; if (me && !me.dead && me.mode !== 'spectator' && hit(me.pos.x, me.pos.y, me.pos.z)) return true;
     for (const q of NET.peers) { if (q === except || !q.open || !q.st || !q.st.p || q.st.dd || q.st.mo === 'spectator' || q.st.d !== G.dim) continue; if (hit(q.st.p[0], q.st.p[1], q.st.p[2])) return true; } return false; }
   // manda de volta o bloco verdadeiro (o mundo do convidado volta a ficar igual ao do anfitrião)
-  function resync(peer, list) { const out = []; for (const e of list) { const [d, x, y, z] = e; const w = worldOf(d); if (!w || !w.chunks.get(ckey(x >> 4, z >> 4))) continue; out.push([d, x, y, z, w.getBlock(x, y, z)]); } if (out.length) send(peer, { t: 'b', l: out }); }
+  function resync(peer, list) { const out = []; for (const e of list) { const [d, x, y, z] = e; const w = worldOf(d); if (!w || !w.chunks.get(ckey(x >> 4, z >> 4))) continue; { const a = w.getAxis ? w.getAxis(x, y, z) : 0; out.push(a ? [d, x, y, z, w.getBlock(x, y, z), a] : [d, x, y, z, w.getBlock(x, y, z)]); } } if (out.length) send(peer, { t: 'b', l: out }); }
   function netRuleOk(peer, o) {
     const now = performance.now(), dead = guestDead(peer), spec = guestSpec(peer);
     switch (o.t) {
@@ -7479,6 +7526,10 @@ MOB_CLASS.villager = function (x, y, z) { return new Villager(x, y, z, Math.floo
       case 'hit': { const e = G.entities.find(e => e.nid === o.i && !e.dead); if (e && e.hurt) { const kb = o.k ? new THREE.Vector3(o.k[0], o.k[1], o.k[2]) : null; const px = proxyOf(peer); const keep = G.player; G.player = px; try { if (o.f) e.fireT = 5; e.invuln = Math.min(e.invuln || 0, 0); e.hurt(o.n, px, kb, !!o.r); } finally { G.player = keep; } } break; }
       case 'use': { const e = G.entities.find(e => e.nid === o.i && !e.dead); if (e) handleUse(peer, e, o); break; }
       case 'summon': { if (worldOf(o.d) === G.world && MOB_TYPES[o.m]) { const m = makeMob(o.m, o.p[0], o.p[1], o.p[2]); G.entities.push(m); } break; }
+      case 'cmd': { if (!NET.guestCmds || !spamOk(peer)) { send(peer, { t: 'chat', m: tr('O dono do mundo não liberou comandos.', 'The host has not allowed commands.'), c: '#f66' }); break; } const v = String(o.v || '').slice(0, 120), c = (v.slice(1).split(/\s+/)[0] || '').toLowerCase();
+        if (['raio', 'lightning'].includes(c) && Array.isArray(o.p) && G.strike && nearGuest(peer, o.p[0], G.player.pos.y, o.p[1], 24)) G.strike(+o.p[0], +o.p[1]);
+        else if (['time', 'weather', 'clima', 'difficulty'].includes(c) || (c === 'kill' && /@e/.test(v))) { const keep = G.cheats; G.cheats = true; try { G.chatSubmit(v); } finally { G.cheats = keep; } }
+        UI.chat('[' + peer.name + '] ' + v, '#aaa'); toAll(envMsg()); break; }
       case 'chat': { if (!peer.name || !spamOk(peer)) break; const m = '<' + peer.name + '> ' + cleanText(String(o.m).slice(0, 200)); UI.chat(m); toAll({ t: 'chat', m }, peer); break; }
       case 'save': saveGuest(peer, o.s); break;
       case 'tnt': { if (worldOf(o.d) === G.world) G.entities.push(new PrimedTNT(o.p[0], o.p[1], o.p[2], o.f)); break; }
@@ -7517,12 +7568,13 @@ MOB_CLASS.villager = function (x, y, z) { return new Villager(x, y, z, Math.floo
       case 'e': applyEnts(o); break;
       case 'pl': applyPlayers(o.l); break;
       case 'left': dropAvatar(o.id); break;
-      case 'env': { G.time = o.time; G.day = o.day; G.raining = o.r; G.weatherT = 1e9; if (o.diff !== undefined) G.difficulty = o.diff; NET.pvp = o.pvp !== false; break; }
+      case 'env': { G.time = o.time; G.day = o.day; G.raining = o.r; G.thundering = !!o.th; G.cheats = !!o.cm; G.weatherT = 1e9; if (o.diff !== undefined) G.difficulty = o.diff; NET.pvp = o.pvp !== false; break; }
       case 'hurt': { if (o.s === 'pvp') { pvpHurtMe(o.d, o.by, o.k); break; } const p = G.player; if (!p || p.dead) break; const kb = o.k ? new THREE.Vector3(o.k[0], o.k[1], o.k[2]) : null; p.damage(o.d, o.s, kb); break; }
       case 'xp': if (G.player) G.player.addXP(o.n); break;
       case 'give': { const p = G.player; if (!p) break; const left = p.give(o.s); Snd.play('pop', 0.5); UI.dirtyHotbar = true; if (left > 0) sendHost({ t: 'drop', d: G.dim, p: [p.pos.x, p.pos.y + 0.5, p.pos.z], s: Object.assign({}, o.s, { c: left }) }); break; }
       case 'held': { const p = G.player; if (p) { p.held = o.s; UI.dirtyHotbar = true; } break; }
       case 'chat': UI.chat(o.m, o.c); break;
+      case 'bolt': if (G.strike && Array.isArray(o.p)) G.strike(+o.p[0], +o.p[2], +o.p[1], true); break;
       case 'deny': NET.denied = o.r; break;
       case 'kpk': if (window.kitReward) kitReward(); break;
       case 'bye': if (peer.open) { peer.open = false; onClose(peer); } break;
@@ -7530,27 +7582,28 @@ MOB_CLASS.villager = function (x, y, z) { return new Villager(x, y, z, Math.floo
     }
   }
   const sendHost = o => send(NET.host, o);
+  window.NETX = { toAll: o => toAll(o), sendHost: o => sendHost(o), send: (p, o) => send(p, o), isHost, isClient };
 
   // ---------- blocos ----------
   const worldOf = d => (G.world && G.world.dim === d) ? G.world : (G.worlds && G.worlds[d]) || null;
   let bq = [];
   function applyBlocks(list, fromPeer) {
     window._netApply = NET.role === 'client';
-    try { for (const [d, x, y, z, id] of list) { const w = worldOf(d);
+    try { for (const [d, x, y, z, id, ax0] of list) { const w = worldOf(d), ax = (+ax0 === 1 || +ax0 === 2) ? +ax0 : 0;
       if (w) { const c = w.chunks.get(ckey(x >> 4, z >> 4)); const old = c ? w.getBlock(x, y, z) : -1;
-        if (c) { if (NET.role === 'client') { w.setBlock(x, y, z, id, { noUpdate: true, keepData: true }); if (old > 0 && !id && w === G.world && G.player && G.player.pos.distanceTo(new THREE.Vector3(x, y, z)) < 24) { Particles.blockBreak(x, y, z, old); Snd.mat(BL[old].snd, 0.5 * G.vol(new THREE.Vector3(x, y, z))); } }
-          else { if (fromPeer && id && BL[id] && BL[id].key.includes('leaves')) (w.bdata.pleaf || (w.bdata.pleaf = {}))[x + ',' + y + ',' + z] = 1; if (fromPeer && !id && old > 0) { Particles.blockBreak(x, y, z, old); Snd.mat(BL[old].snd, 0.6 * G.vol(new THREE.Vector3(x, y, z))); } w.setBlock(x, y, z, id); } }
-        else { const k = ckey(x >> 4, z >> 4); (w.mods[k] || (w.mods[k] = {}))[(y * 16 + (z & 15)) * 16 + (x & 15)] = id; } }
-      else { const D = G.dimData[d] || (G.dimData[d] = { mods: {}, bdata: {} }); const k = ckey(x >> 4, z >> 4); (D.mods[k] || (D.mods[k] = {}))[(y * 16 + (z & 15)) * 16 + (x & 15)] = id; } } }
+        if (c) { if (NET.role === 'client') { w.setBlock(x, y, z, id, { noUpdate: true, keepData: true, ax }); if (old > 0 && !id && w === G.world && G.player && G.player.pos.distanceTo(new THREE.Vector3(x, y, z)) < 24) { Particles.blockBreak(x, y, z, old); Snd.mat(BL[old].snd, 0.5 * G.vol(new THREE.Vector3(x, y, z))); } }
+          else { if (fromPeer && id && BL[id] && BL[id].key.includes('leaves')) (w.bdata.pleaf || (w.bdata.pleaf = {}))[x + ',' + y + ',' + z] = 1; if (fromPeer && !id && old > 0) { Particles.blockBreak(x, y, z, old); Snd.mat(BL[old].snd, 0.6 * G.vol(new THREE.Vector3(x, y, z))); } w.setBlock(x, y, z, id, { ax }); } }
+        else { const k = ckey(x >> 4, z >> 4); (w.mods[k] || (w.mods[k] = {}))[(y * 16 + (z & 15)) * 16 + (x & 15)] = id + 256 * ax; } }
+      else { const D = G.dimData[d] || (G.dimData[d] = { mods: {}, bdata: {} }); const k = ckey(x >> 4, z >> 4); (D.mods[k] || (D.mods[k] = {}))[(y * 16 + (z & 15)) * 16 + (x & 15)] = id + 256 * ax; } } }
     finally { window._netApply = false; }
   }
   const sb = World.prototype.setBlock;
   World.prototype.setBlock = function (x, y, z, id, opts) {
     if (NET.role === 'client' && NET.host && !window._netApply && this === G.world) opts = Object.assign({}, opts, { noUpdate: true }); // no convidado o anfitrião faz água correr, areia cair, etc.
-    const old = (NET.role && this.chunks.get(ckey(x >> 4, z >> 4))) ? this.getBlock(x, y, z) : null;
-    const r = sb.call(this, x, y, z, id, opts);
+    const old = (NET.role && this.chunks.get(ckey(x >> 4, z >> 4))) ? this.getBlock(x, y, z) : null, oax = old !== null && this.getAxis ? this.getAxis(x, y, z) : 0;
+    const r = sb.call(this, x, y, z, id, opts); const nax = old !== null && this.getAxis ? this.getAxis(x, y, z) : 0;
     if (NET.role === 'client' && !window._netApply) { if (touched.size > 5000) touched.clear(); touched.add(x + ',' + y + ',' + z); }
-    if (NET.role && !window._netApply && old !== null && old !== id && (this === G.world || (G.worlds && G.worlds[this.dim] === this)) && (isHost() || isClient())) bq.push([this.dim, x, y, z, id]);
+    if (NET.role && !window._netApply && old !== null && (old !== id || oax !== nax) && (this === G.world || (G.worlds && G.worlds[this.dim] === this)) && (isHost() || isClient())) bq.push(nax ? [this.dim, x, y, z, id, nax] : [this.dim, x, y, z, id]);
     return r;
   };
   // ---------- dados de blocos (baús, fornalhas, direção de escadas/portas...) ----------
@@ -7750,7 +7803,7 @@ MOB_CLASS.villager = function (x, y, z) { return new Villager(x, y, z, Math.floo
   // botão PvP no menu de pausa (só quem criou o mundo muda)
   const bPvp = document.createElement('button'); bPvp.className = 'btn'; bPvp.id = 'pPvp';
   const pvpLabel = () => { bPvp.textContent = tr('PvP: ', 'PvP: ') + (pvpOn() ? tr('Ligado', 'On') : tr('Desligado', 'Off')); bPvp.style.display = NET.active() ? '' : 'none'; bPvp.disabled = NET.role === 'client'; };
-  bPvp.onclick = () => { if (NET.role !== 'host') return; G.endState.pvp = !pvpOn(); pvpLabel(); const m = tr('PvP ', 'PvP ') + (pvpOn() ? tr('ligado', 'on') : tr('desligado', 'off')); UI.chat(m, '#ff5'); toAll({ t: 'chat', m, c: '#ff5' }); toAll({ t: 'env', time: G.time, day: G.day, r: !!G.raining, diff: G.difficulty, pvp: pvpOn() }); };
+  bPvp.onclick = () => { if (NET.role !== 'host') return; G.endState.pvp = !pvpOn(); pvpLabel(); const m = tr('PvP ', 'PvP ') + (pvpOn() ? tr('ligado', 'on') : tr('desligado', 'off')); UI.chat(m, '#ff5'); toAll({ t: 'chat', m, c: '#ff5' }); toAll(envMsg()); };
   NET._pvpLabel = pvpLabel; NET._pvpBtn = bPvp;
   // ---------- ciclo da rede (roda a cada quadro) ----------
   let tP = 0, tE = 0, tEnv = 0, tSave = 0;
@@ -7770,7 +7823,7 @@ MOB_CLASS.villager = function (x, y, z) { return new Villager(x, y, z, Math.floo
       if (tP <= 0) { tP = 1 / 15; const me = myState(); for (const peer of NET.peers) { if (!peer.open) continue; const l = [me]; for (const o of NET.peers) if (o !== peer && o.st && o.open) l.push(Object.assign({}, o.st, { id: o.id, n: o.name, sk: o.skin, save: undefined })); send(peer, { t: 'pl', l }); }
         const L = []; for (const o of NET.peers) if (o.st && o.open) L.push(Object.assign({}, o.st, { id: o.id, n: o.name, sk: o.skin })); applyPlayers(L); }
       if (tE <= 0) { tE = 0.1; for (const peer of NET.peers) if (peer.open && peer.st) send(peer, entsFor(peer)); }
-      if (tEnv <= 0) { tEnv = 1; toAll({ t: 'env', time: G.time, day: G.day, r: !!G.raining, diff: G.difficulty, pvp: pvpOn() }); }
+      if (tEnv <= 0) { tEnv = 1; toAll(envMsg()); }
     } else {
       if (tP <= 0) { tP = 1 / 15; const st = myState(); if (tSave <= 0) { tSave = 8; st.save = guestSave(); } sendHost(Object.assign({ t: 'me' }, st)); }
     }
@@ -8355,6 +8408,7 @@ body.touch #actbtn.show{display:block}`;
     ['items', '', 'Lista todos os itens', 'List all items', []],
     ['mobs', '', 'Lista todas as criaturas', 'List all mobs', []],
     ['players', '', 'Quem está jogando (multijogador)', 'Who is online (multiplayer)', []],
+    ['comandos', '<on|off>', 'Libera ou bloqueia comandos dos convidados (dono)', 'Allow or block guest commands (host)', [['on', 'off']]],
     ['kick', '<jogador>', 'Expulsa um jogador (dono)', 'Kick a player (host)', []],
     ['mute', '<jogador> [minutos]', 'Deixa um jogador mudo (dono)', 'Mute a player (host)', []],
     ['help', '', 'Ajuda', 'Help', []]
@@ -8496,7 +8550,7 @@ body.chopen #touchui,body.chopen #chatlog,body.chopen #itemname,body.chopen #hot
     const real = this.master, lp = this.ctx.createBiquadFilter(); lp.type = 'lowpass'; lp.frequency.value = pend.f; lp.Q.value = 0.5; lp.connect(real);
     const rev = this.sfxRev; this.master = lp; if (rev && pend.q) this.sfxRev = lp; // atrás da parede: sem eco "aberto"
     try { return pl(name, vol); } finally { this.master = real; this.sfxRev = rev; } };
-  const mt = Snd.mat && Snd.mat.bind(Snd); if (mt) Snd.mat = function () { if (!pend || performance.now() - pendT > 4) return mt.apply(this, arguments); const real = this.master, lp = this.ctx.createBiquadFilter(); lp.type = 'lowpass'; lp.frequency.value = pend.f; lp.connect(real); this.master = lp; try { return mt.apply(this, arguments); } finally { this.master = real; } };
+  const mt = Snd.mat && Snd.mat.bind(Snd); if (mt) Snd.mat = function () { if (!pend || performance.now() - pendT > 4 || !this.ctx || !this.master) return mt.apply(this, arguments); const real = this.master, lp = this.ctx.createBiquadFilter(); lp.type = 'lowpass'; lp.frequency.value = pend.f; lp.connect(real); this.master = lp; try { return mt.apply(this, arguments); } finally { this.master = real; } };
 })();
 
 // ===== REGRAS GLOBAIS: quando uma tela está aberta (inventário, baú, chat, pausa, morte), nada acontece no mundo =====
@@ -8832,9 +8886,11 @@ body.chopen #touchui,body.chopen #chatlog,body.chopen #itemname,body.chopen #hot
     if (dist < 40) band(4000, 600, 0.35, 0.9 * vol, 0, 'lowpass');
     band(420, 60, 3.2, 0.9 * vol, 0.05); band(240, 40, 4.5, 0.7 * vol, 0.35); band(160, 35, 5.5, 0.55 * vol, 1.1);
   }
-  G.strike = function (x, z, y) {
+  G.strike = function (x, z, y, fxOnly) {
     const w = this.world; if (!w) return; x = Math.floor(x); z = Math.floor(z); if (y === undefined) y = w.topAt(x, z) + 1;
     makeBolt(x + 0.5, y, z + 0.5); this.flash = 1; const p = this.player, d = Math.hypot(p.pos.x - x, p.pos.z - z); thunderSound(d);
+    if (fxOnly) return; // convidado: só o desenho, o som e o clarão (o dono cuida do fogo e do dano)
+    const NX = window.NETX; if (NX && NX.isHost()) { NX.toAll({ t: 'bolt', p: [x, y, z] }); for (const peer of NET.peers) { const px = peer.proxy; if (px && !px.dead && px.dim === this.dim && Math.hypot(px.pos.x - x - 0.5, px.pos.z - z - 0.5) < 3 && Math.abs(px.pos.y - y) < 4) px.damage(5, 'lightning'); } }
     // fogo e dano no lugar do raio
     if (this.difficulty > 0 && Math.random() < 0.7) try { FireSys.ignite(x, y, z); } catch (e) { }
     for (const e of this.entities) if (e instanceof Mob && !e.dying && Math.hypot(e.pos.x - x - 0.5, e.pos.z - z - 0.5) < 3 && Math.abs(e.pos.y - y) < 4) { e.hurt(5, null, null); e.fireT = 8; }
@@ -8844,13 +8900,15 @@ body.chopen #touchui,body.chopen #chatlog,body.chopen #itemname,body.chopen #hot
   let nextT = 6;
   const up = G.tick; G.tick = function (dt) {
     const wasRain = this.raining; const r = up.apply(this, arguments);
-    if (this.state === 'play' && this.world) {
+    const guest = window.NETX && NETX.isClient();
+    if (this.state === 'play' && this.world && !guest) {
       if (this.raining && !wasRain && this.dim === 'overworld') this.thundering = Math.random() < 0.3; // chuva nova: às vezes vira tempestade
       if (!this.raining) this.thundering = false;
       const on = this.thundering && this.dim === 'overworld'; this.thunderF += ((on ? 1 : 0) - this.thunderF) * Math.min(1, dt * 0.4);
       if (on && this.rainF > 0.6) { nextT -= dt; if (nextT <= 0) { nextT = 4 + Math.random() * 14; const p = this.player, a = Math.random() * Math.PI * 2, rr = 8 + Math.random() * 70; this.strike(p.pos.x + Math.cos(a) * rr, p.pos.z + Math.sin(a) * rr); } }
     }
     if (this.thunderHold) return r; // só para testes
+    if (guest) this.thunderF += ((this.thundering && this.dim === 'overworld' ? 1 : 0) - this.thunderF) * Math.min(1, dt * 0.4);
     for (let i = bolts.length - 1; i >= 0; i--) { const b = bolts[i]; b.t -= dt; b.g.visible = b.t > 0.3 || (b.t * 20 | 0) % 2 === 0; if (b.t <= 0) { this.scene.remove(b.g); bolts.splice(i, 1); } }
     this.flash = Math.max(0, this.flash - dt * 3.2);
     return r;
@@ -8952,4 +9010,20 @@ html,body,*{overscroll-behavior:none}
   addEventListener('resize', () => requestAnimationFrame(fit));
   // lista de servidores sem emoji de cadeado
   new MutationObserver(ms => { for (const m of ms) for (const n of m.addedNodes) if (n.nodeType === 1 && n.classList && n.classList.contains('lob') && /🔒/.test(n.textContent)) n.textContent = n.textContent.replace(/🔒\s*/, '[' + L('senha', 'password') + '] '); }).observe(document.body, { childList: true, subtree: true });
+})();
+
+// ================= REGRA DO ESPELHO (multijogador): o que muda o mundo passa pelo dono e chega igual para todos =================
+// Comandos do convidado: só se o dono liberar (/comandos on). Os que mudam o mundo (hora, clima, raio, dificuldade, /kill @e) vão
+// para o dono executar; os pessoais (/give, /heal, /tp, /gamemode...) rodam só no convidado.
+(function () {
+  const en = () => S.lang === 'en', L = (pt, e) => en() ? e : pt;
+  const WORLD = new Set(['time', 'weather', 'clima', 'difficulty', 'raio', 'lightning']);
+  const cs = G.chatSubmit; G.chatSubmit = function (v) {
+    const NX = window.NETX; v = String(v || '');
+    if (NX && NX.isClient() && v[0] === '/') { const c = (v.slice(1).split(/\s+/)[0] || '').toLowerCase();
+      if (!this.cheats) { UI.chat(L('O dono do mundo não liberou comandos para convidados.', 'The host has not allowed commands for guests.'), '#f66'); return; }
+      if (WORLD.has(c) || (c === 'kill' && /@e/.test(v))) { const o = { t: 'cmd', v }; if (c === 'raio' || c === 'lightning') { const d = this.lookDir(); o.p = [this.player.pos.x + d.x * 8, this.player.pos.z + d.z * 8]; } NX.sendHost(o); return; } }
+    if (window.NET && NET.role === 'host') { const m = /^\/(comandos|commands)\s+(\S+)/i.exec(v); if (m) { const on = /^(on|sim|liga|ligar|yes|1)$/i.test(m[2]); NET.guestCmds = on; const msg = L('Comandos para convidados: ', 'Guest commands: ') + (on ? L('liberados', 'allowed') : L('bloqueados', 'blocked')); UI.chat(msg, '#ff5'); if (window.NETX) NETX.toAll({ t: 'chat', m: msg, c: '#ff5' }); return; } }
+    return cs.apply(this, arguments);
+  };
 })();
