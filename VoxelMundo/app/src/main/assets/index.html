@@ -1982,7 +1982,7 @@ const ckey = (cx, cz) => cx + ',' + cz;
 const B_ = k => BID[k];
 const BIOME = { PLAINS: 0, FOREST: 1, DESERT: 2, SNOW: 3, OCEAN: 4, BEACH: 5, MOUNTAIN: 6 };
 Object.assign(BIOME, { SAVANNA: 7, JUNGLE: 8, SWAMP: 9, BADLANDS: 10, BIRCH: 11 });
-const BIOME_NAMES = ['Planícies', 'Floresta', 'Deserto', 'Taiga Nevada', 'Oceano', 'Praia', 'Montanhas', 'Savana', 'Selva', 'Pântano', 'Terras Áridas', 'Floresta de Bétulas', 'Rio', 'Bosque de Cerejeiras', 'Campos de Cogumelos', 'Floresta Sombria', 'Campo Florido', 'Picos de Gelo', 'Oceano Profundo', 'Oceano Quente', 'Oceano Congelado'];
+const BIOME_NAMES = ['Planícies', 'Floresta', 'Deserto', 'Taiga Nevada', 'Oceano', 'Praia', 'Montanhas', 'Savana', 'Selva', 'Pântano', 'Terras Áridas', 'Floresta de Bétulas', 'Rio', 'Bosque de Cerejeiras', 'Campos de Cogumelos', 'Floresta Sombria', 'Campo Florido', 'Picos de Gelo', 'Oceano Profundo', 'Oceano Quente', 'Oceano Congelado', 'Taiga'];
 const BIOME_TINT = [[1, 1, 1], [0.9, 1, 0.88], [1.1, 0.98, 0.7], [0.8, 0.92, 0.9], [1, 1, 1], [1, 1, 1], [0.84, 0.95, 0.88], [1.2, 1.0, 0.55], [0.82, 1.12, 0.68], [0.7, 0.76, 0.52], [1.14, 0.94, 0.58], [0.98, 1.06, 0.9], [1, 1, 1], [0.95, 1.08, 0.82], [0.9, 1.0, 0.85], [0.72, 0.92, 0.62], [0.95, 1.1, 0.8], [0.8, 0.92, 0.9], [1, 1, 1], [1, 1, 1], [1, 1, 1]];
 const swampF = (t, w) => clamp((w - 0.12) * 6, 0, 1) * clamp((0.06 - t) * 8, 0, 1) * clamp((t + 0.22) * 8, 0, 1);
 class Chunk {
@@ -2052,6 +2052,13 @@ class World {
     const G3 = this.gen >= 3, nV = G3 ? this.nR.n2(x * 0.0021 + 333, z * 0.0021 - 333) : 0;
     if (G3 && this.gen < 4 && T2.cont < 0.07 && h > SEA + 1 && h < SEA + 20 && this.nC.n2(x * 0.0016 - 911, z * 0.0016 + 517) > 0.6) return 14; // campos de cogumelos (raros, perto da costa)
     if (h > SEA + 26) return BIOME.MOUNTAIN;
+    if (this.gen >= 5) { // faixas de temperatura: congelado → frio → temperado → quente (nada de gelo encostado em bétula)
+      if (t < -0.30) return (t < -0.40 && w < -0.04 && nV > 0.5) ? 17 : BIOME.SNOW;   // Picos de Gelo: raro, só no meio do frio e seco
+      if (t < -0.14) return w < -0.12 ? BIOME.PLAINS : 21;                          // faixa fria: planície ou Taiga
+      if (t <= 0.3) { if (h > SEA + 9 && w > -0.08 && w < 0.25 && nV < -0.38 && t > -0.02) return 13; if (w < -0.08 && nV > 0.48 && t > 0) return 16; if (w >= 0.25 && t > 0.0 && t < 0.2) return 15; }
+      if (t > 0.3) { if (w < -0.12) return BIOME.DESERT; if (w < 0.18) return this.nM.n2(x * 0.004 + 77, z * 0.004 - 77) > 0.35 ? BIOME.BADLANDS : BIOME.SAVANNA; return BIOME.JUNGLE; }
+      if (t > 0.06) { if (w < -0.08) return BIOME.PLAINS; if (w < 0.25) return BIOME.FOREST; return BIOME.JUNGLE; }
+      if (w < -0.08) return BIOME.PLAINS; if (w < 0.12) return t > -0.1 ? BIOME.BIRCH : BIOME.FOREST; return sf < 0.3 ? BIOME.FOREST : BIOME.SWAMP; }
     if (tS < -0.25) return G3 && nV > 0.42 ? 17 : BIOME.SNOW;
     if (G3 && t <= 0.3) { if (h > SEA + 9 && w > -0.08 && w < 0.25 && nV < -0.38) return 13; if (w < -0.08 && nV > 0.48) return 16; if (w >= 0.25 && t > 0.0 && t < 0.2) return 15; }
     if (t > 0.3) { if (w < -0.12) return BIOME.DESERT; if (w < 0.18) return this.nM.n2(x * 0.004 + 77, z * 0.004 - 77) > 0.35 ? BIOME.BADLANDS : BIOME.SAVANNA; return BIOME.JUNGLE; }
@@ -2175,6 +2182,7 @@ class World {
         else if (bio === BIOME.FOREST) { if (k < 0.045 && inner(x, z, 2) && !logNear(x, y1, z, 2)) { const birch = hash3(wx, 9, wz, seed) < 0.15; oak(x, y1, z, birch ? B_('birch_log') : B_('log'), birch ? B_('birch_leaves') : B_('leaves'), (birch ? 5 : 4) + (r() * 3 | 0)); } else if (k < 0.2) set(x, y1, z, B_('tallgrass')); else if (k < 0.205) set(x, y1, z, B_('brown_mushroom')); else if (k < 0.208) set(x, y1, z, B_('red_mushroom')); else if (k < 0.215) set(x, y1, z, B_('poppy')); }
         else if (bio === BIOME.BIRCH) { if (k < 0.04 && inner(x, z, 2) && !logNear(x, y1, z, 2)) oak(x, y1, z, B_('birch_log'), B_('birch_leaves'), 5 + (r() * 3 | 0)); else if (k < 0.16) set(x, y1, z, B_('tallgrass')); else if (k < 0.17) set(x, y1, z, B_('dandelion')); else if (k < 0.175) set(x, y1, z, B_('poppy')); }
         else if (bio === BIOME.SNOW) { if (k < 0.025 && inner(x, z, 2) && !logNear(x, y1, z, 2)) spruce(x, y1, z, 6 + (r() * 4 | 0)); else if (k < 0.05) set(x, y1, z, B_('tallgrass')); }
+        else if (bio === 21) { if (k < 0.04 && inner(x, z, 2) && !logNear(x, y1, z, 2)) spruce(x, y1, z, 6 + (r() * 5 | 0)); else if (k < 0.16) set(x, y1, z, B_('tallgrass')); else if (k < 0.165) set(x, y1, z, B_('brown_mushroom')); }
         else if (bio === BIOME.MOUNTAIN) { if (k < 0.01 && inner(x, z, 2) && !logNear(x, y1, z, 2)) spruce(x, y1, z, 5 + (r() * 3 | 0)); }
         else if (bio === BIOME.SAVANNA) { if (k < 0.005 && inner(x, z, 3) && !logNear(x, y1, z, 5)) acacia(x, y1, z); else if (k < 0.32) set(x, y1, z, B_('tallgrass')); }
         else if (bio === BIOME.JUNGLE) { if (k < 0.03 && inner(x, z, 3) && !logNear(x, y1, z, 3)) jungle(x, y1, z, 8 + (r() * 6 | 0)); else if (k < 0.08 && inner(x, z, 1) && !logNear(x, y1, z, 1)) bush(x, y1, z); else if (k < 0.38) set(x, y1, z, B_('tallgrass')); else if (k < 0.385) set(x, y1, z, B_('melon')); }
@@ -4795,7 +4803,7 @@ const G = {
   },
   newWorld(o) {
     const id = 'w' + Date.now().toString(36); let seed = o.seed.trim(); let s = seed === '' ? (Math.random() * 2e9) | 0 : (/^-?\d+$/.test(seed) ? parseInt(seed) | 0 : hashStr(seed) | 0);
-    const meta = { id, name: o.name || 'Novo Mundo', seed: s, mode: o.mode, last: Date.now(), difficulty: o.difficulty, cheats: o.cheats, keepInv: o.keepInv || o.type === 'arena' || o.type === 'kitpvp', gen: 4, type: o.type || 'normal' };
+    const meta = { id, name: o.name || 'Novo Mundo', seed: s, mode: o.mode, last: Date.now(), difficulty: o.difficulty, cheats: o.cheats, keepInv: o.keepInv || o.type === 'arena' || o.type === 'kitpvp', gen: 5, type: o.type || 'normal' };
     const ws = this.listWorlds(); ws.push(meta); this.setWorlds(ws); this.startGame(meta, null);
   },
   loadWorld(id) { const meta = this.listWorlds().find(w => w.id === id); if (!meta) return; let data = null; try { data = JSON.parse(localStorage.getItem('vm_w_' + id)); } catch (e) { } this.startGame(meta, data); },
@@ -5226,7 +5234,7 @@ const G = {
   interact(dt) {
     const p = this.player, w = this.world; const eye = new THREE.Vector3(p.pos.x, p.eyeY(), p.pos.z); const dir = this.lookDir(); const creative = p.mode === 'creative';
     const reach = p.attr('block_interaction_range') + (creative ? 0.5 : 0); const hit = (UI.open || p.mode === 'spectator') ? null : w.raycast(eye, dir, reach, false);
-    const held = p.held, hit_ = held ? IT[held.id] : null; const ereach = (creative ? 2 : 0) + ((hit_ && hit_.reach) || 3) - 3 + p.attr('entity_interaction_range');
+    const held = p.held, hit_ = held ? IT[held.id] : null; const ereach = (creative ? 1 : 0) + ((hit_ && hit_.reach) || 3) - 3 + p.attr('entity_interaction_range');
     let ent = null, et = 1e9; if (!UI.open && p.mode !== 'spectator') for (const e of this.entities) { if (!(e instanceof Mob) || e.dying) continue; const bb = e.aabb(); const t = segAABB(eye, dir, ereach, bb.min, bb.max); if (t >= 0 && t < et) { et = t; ent = e; } }
     if (ent && hit && hit.t < et) ent = null;
     this.target = hit; this.entTarget = ent;
@@ -5235,7 +5243,7 @@ const G = {
     // ataque / mineração
     if (L && ent) { this.breaking = null; if (this.lPressed || this.attackCharge() >= 1) this.attack(ent); }
     else if (L && hit) {
-      if (creative) { if (this.lPressed || (this.breakCd -= dt) <= 0) { this.breakCd = 0.25; this.breakBlock(hit.x, hit.y, hit.z); } }
+      if (creative) { if (this.lPressed || (this.breakCd = (+this.breakCd || 0) - dt) <= 0) { this.breakCd = 0.25; this.breakBlock(hit.x, hit.y, hit.z); } }
       else {
         const br = this.breaking; if (!br || br.x !== hit.x || br.y !== hit.y || br.z !== hit.z) this.breaking = { x: hit.x, y: hit.y, z: hit.z, prog: 0, snd: 0 };
         const b = this.breaking; const bt = this.breakTime(hit.id); b.prog += dt / bt; b.snd -= dt; if (b.snd <= 0) { b.snd = 0.22; Snd.mat(BL[hit.id].snd, 0.3, 'dig'); Particles.spawn(hit.x + 0.5 + hit.n[0] * 0.52, hit.y + 0.5 + hit.n[1] * 0.52, hit.z + 0.5 + hit.n[2] * 0.52, TILE_AVG[BL[hit.id].tex.side], 3, 2, 0.5, 15, 0.3); this.swing = 1; }
@@ -8380,6 +8388,7 @@ body.touch:not(.taim-cross) #bAtk, body.touch:not(.taim-cross) #bUse{display:non
   -webkit-mask:radial-gradient(circle, transparent 27px, #000 28px, #000 36px, transparent 37px);mask:radial-gradient(circle, transparent 27px, #000 28px, #000 36px, transparent 37px);
   filter:drop-shadow(0 0 2px rgba(0,0,0,.6))}
 #tcircle.on{display:block}
+body.touch.aimitem #xhair{display:block}
 #tcircle::after{content:'';position:absolute;left:50%;top:50%;width:8px;height:8px;margin:-4px 0 0 -4px;border-radius:50%;background:rgba(255,255,255,.7)}`;
   document.head.appendChild(st);
   const ring = document.createElement('div'); ring.id = 'tcircle'; document.body.appendChild(ring);
@@ -8394,7 +8403,9 @@ body.touch:not(.taim-cross) #bAtk, body.touch:not(.taim-cross) #bUse{display:non
   cv.addEventListener('touchend', end, { passive: true }); cv.addEventListener('touchcancel', end, { passive: true });
 
   // usa o ponto do dedo enquanto ele está parado/segurando (e um instante depois de um toque rápido)
-  const aimDir = () => { if (!tapMode() || G.camMode !== 0) return null;
+  const RANGED = new Set(['snowball', 'egg', 'void_pearl', 'wind_charge', 'trident', 'splash_potion']);
+  window.heldRanged = () => { const s = G.player && G.player.held, it = s ? IT[s.id] : null; return !!it && (it.tool === 'bow' || it.tool === 'crossbow' || RANGED.has(it.key) || /splash/.test(it.key)); };
+  const aimDir = () => { if (!tapMode() || G.camMode !== 0 || heldRanged()) return null;
     const active = aim.id !== undefined ? (!aim.moved || G.touchHold) : performance.now() < aim.keep; if (!active) return null;
     const v = new THREE.Vector3((aim.x / innerWidth) * 2 - 1, -(aim.y / innerHeight) * 2 + 1, 0.5).unproject(G.camera); return v.sub(G.camera.position).normalize(); };
   G.touchAimDir = aimDir;
@@ -8404,7 +8415,7 @@ body.touch:not(.taim-cross) #bAtk, body.touch:not(.taim-cross) #bUse{display:non
   for (const fn of ['use', 'attack']) if (typeof G[fn] === 'function') { const o = G[fn]; G[fn] = function () { const d = aimDir(); if (!d) return o.apply(this, arguments); const ld = this.lookDir; this.lookDir = () => d.clone(); try { return o.apply(this, arguments); } finally { this.lookDir = ld; } }; }
 
   // círculo de toque: aparece só quando você segura o dedo para quebrar/atacar, e enche conforme o bloco quebra
-  const loop = () => { requestAnimationFrame(loop);
+  const loop = () => { requestAnimationFrame(loop); { const on = tapMode() && G.state === 'play' && heldRanged(); if (on !== document.body.classList.contains('aimitem')) document.body.classList.toggle('aimitem', on); }
     const show = tapMode() && G.state === 'play' && !UI.open && G.touchHold && aim.id !== undefined;
     if (!show) { if (ring.classList.contains('on')) ring.classList.remove('on'); return; }
     ring.classList.add('on'); ring.style.left = aim.x + 'px'; ring.style.top = aim.y + 'px';
@@ -8484,11 +8495,15 @@ body.touch #actbtn.show{display:block}`;
     return it.apply(this, arguments); };
   // usar/colocar e atacar também respeitam a regra
   for (const fn of ['use', 'attack']) if (typeof G[fn] === 'function') { const o = G[fn]; G[fn] = function () { if (!(G.player && G.player.net) && G.worldLocked()) return; return o.apply(this, arguments); }; /* ações feitas pelo anfitrião em nome de um convidado não são bloqueadas pela tela do anfitrião */ }
+  G.entReach = function () { const p = this.player, s = p && p.held, it = s ? IT[s.id] : null; return (p && p.mode === 'creative' ? 1 : 0) + ((it && it.reach) || 3) - 3 + (p ? p.attr('entity_interaction_range') : 3); };
+  { const at = G.attack; G.attack = function (mob) { const p = this.player; if (p && !p.net && mob && mob.aabb) { const bb = mob.aabb(), ex = p.pos.x, ey = p.eyeY(), ez = p.pos.z;
+      const cx = Math.max(bb.min.x, Math.min(ex, bb.max.x)), cy = Math.max(bb.min.y, Math.min(ey, bb.max.y)), cz = Math.max(bb.min.z, Math.min(ez, bb.max.z));
+      if (Math.hypot(cx - ex, cy - ey, cz - ez) > this.entReach() + 0.3) return; } return at.apply(this, arguments); }; }
   const cv = G.renderer.domElement;
   const lift = e => { if (!e.touches || e.touches.length === 0) G.needLift = false; };
   window.addEventListener('touchend', lift, true); window.addEventListener('touchcancel', lift, true);
   // um toque que começou com a tela aberta não vira "segurar para quebrar" quando ela fecha
-  cv.addEventListener('touchstart', () => { if (G.worldLocked()) G.needLift = true; }, { passive: true, capture: true });
+  cv.addEventListener('touchstart', () => { if (G.worldLocked()) G.needLift = true; else G.needLift = false; }, { passive: true, capture: true });
   // perder o foco (trocar de app, notificação) solta tudo
   window.addEventListener('blur', () => clearActs(G)); document.addEventListener('visibilitychange', () => { if (document.hidden) clearActs(G); });
 })();
