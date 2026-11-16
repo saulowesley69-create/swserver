@@ -1,0 +1,61 @@
+name: VoxelMundo APK
+
+# Só roda no branch "voxelmundo" — não mexe no site nem no AstroStack.
+on:
+  push:
+    branches: [voxelmundo]
+    paths:
+      - 'VoxelMundo/**'
+      - '.github/workflows/voxelmundo-apk.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: VoxelMundo
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.9'
+
+      - name: Compilar APK
+        run: |
+          set -o pipefail
+          gradle assembleDebug --no-daemon 2>&1 | tee build.log || {
+            grep -E "^e: |error:|What went wrong" -A2 build.log | head -40 | while IFS= read -r l; do
+              echo "::error::$l"
+            done
+            exit 1
+          }
+
+      - name: Renomear APK
+        run: cp app/build/outputs/apk/debug/app-debug.apk VoxelMundo.apk
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: VoxelMundo-apk
+          path: VoxelMundo/VoxelMundo.apk
+
+      - name: Publicar em Releases (link direto pro celular)
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: voxelmundo-v${{ github.run_number }}
+          name: VoxelMundo (APK ${{ github.run_number }})
+          target_commitish: ${{ github.sha }}
+          files: VoxelMundo/VoxelMundo.apk
+          body: |
+            Baixe o **VoxelMundo.apk** abaixo e instale no Android.
+            (Se pedir, permita "instalar apps de fontes desconhecidas".)
+            Tela cheia: a barra de navegação some; arraste da borda de baixo para ela aparecer por um instante.
