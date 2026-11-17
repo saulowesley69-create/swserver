@@ -8380,6 +8380,67 @@ body.touch #actbtn.show{display:block}`;
 // o jogo já abriu o menu antes deste arquivo carregar: troca o mundo de fundo pela "foto 3D" logo de cara
 (function () { if (window.VM_ASSETS && G.state === 'title' && G.world && G.pano && !G.pano.fail) G.toTitle(); })();
 
+// ================= CAVE CULLING: só desenha os pedaços do mundo que dá para enxergar de onde você está =================
+// Cada coluna de chunk é dividida em pedaços de 16 blocos de altura. Para cada pedaço guardamos por quais lados
+// o ar (ou água, vidro, folhas...) atravessa de um lado para o outro. Depois, saindo do pedaço onde está a câmera,
+// andamos só pelos caminhos abertos e nunca "voltando" na direção da câmera. O que não for alcançado não é desenhado.
+// Para não aumentar o número de desenhos, a malha de cada chunk fica ordenada por altura e só a faixa visível é desenhada.
+(function () {
+  const NS = Math.ceil(WH / 16), FACE = [[1, 0, 0], [-1, 0, 0], [0, 1, 0], [0, -1, 0], [0, 0, 1], [0, 0, -1]];
+  // ---------- malha ordenada por pedaço de altura ----------
+  const b2g = bufToGeo;
+  bufToGeo = function (A) {
+    if (!A || !A.n) return b2g(A); const nq = A.n / 4, sec = new Int32Array(nq), cnt = new Int32Array(NS);
+    for (let q = 0; q < nq; q++) { const o = q * 12, yc = (A.p[o + 1] + A.p[o + 4] + A.p[o + 7] + A.p[o + 10]) / 4; let s = Math.floor((yc - 0.01) / 16); s = s < 0 ? 0 : s >= NS ? NS - 1 : s; sec[q] = s; cnt[s]++; }
+    const start = new Int32Array(NS + 1); for (let s = 0; s < NS; s++) start[s + 1] = start[s] + cnt[s];
+    const pos = start.slice(0, NS), P = new Array(A.p.length), U = new Array(A.u.length), C = new Array(A.c.length), Lg = new Array(A.l.length), I = new Array(A.i.length);
+    for (let q = 0; q < nq; q++) { const d = pos[sec[q]]++; for (let k = 0; k < 12; k++) P[d * 12 + k] = A.p[q * 12 + k]; for (let k = 0; k < 8; k++) { U[d * 8 + k] = A.u[q * 8 + k]; Lg[d * 8 + k] = A.l[q * 8 + k]; } for (let k = 0; k < 12; k++) C[d * 12 + k] = A.c[q * 12 + k];
+      for (let k = 0; k < 6; k++) I[d * 6 + k] = A.i[q * 6 + k] - q * 4 + d * 4; }
+    const g = b2g({ p: P, u: U, c: C, l: Lg, i: I, n: A.n }); if (g) g.userData.sec = Array.from(start, v => v * 6); return g; };
+  // ---------- por onde o ar atravessa cada pedaço ----------
+  const vis = new Uint8Array(4096), stack = new Int32Array(4096);
+  function connect(ch) {
+    const d = ch.data, out = new Uint8Array(NS * 6);
+    for (let s = 0; s < NS; s++) { const y0 = s * 16; let open = 0; vis.fill(0);
+      for (let i = 0; i < 4096; i++) { const y = y0 + (i >> 8); if (y >= WH || OPAQ[d[(y * 16 + ((i >> 4) & 15)) * 16 + (i & 15)]]) vis[i] = 1; else open++; }
+      if (open === 4096) { for (let f = 0; f < 6; f++) out[s * 6 + f] = 63; continue; } if (!open) continue;
+      for (let i0 = 0; i0 < 4096; i0++) { if (vis[i0]) continue; let sp = 0, mask = 0; stack[sp++] = i0; vis[i0] = 1;
+        while (sp) { const i = stack[--sp], x = i & 15, z = (i >> 4) & 15, y = i >> 8;
+          if (x === 15) mask |= 1; if (x === 0) mask |= 2; if (y === 15) mask |= 4; if (y === 0) mask |= 8; if (z === 15) mask |= 16; if (z === 0) mask |= 32;
+          if (x < 15 && !vis[i + 1]) { vis[i + 1] = 1; stack[sp++] = i + 1; } if (x > 0 && !vis[i - 1]) { vis[i - 1] = 1; stack[sp++] = i - 1; }
+          if (z < 15 && !vis[i + 16]) { vis[i + 16] = 1; stack[sp++] = i + 16; } if (z > 0 && !vis[i - 16]) { vis[i - 16] = 1; stack[sp++] = i - 16; }
+          if (y < 15 && !vis[i + 256]) { vis[i + 256] = 1; stack[sp++] = i + 256; } if (y > 0 && !vis[i - 256]) { vis[i - 256] = 1; stack[sp++] = i - 256; } }
+        for (let f = 0; f < 6; f++) if (mask & (1 << f)) out[s * 6 + f] |= mask; } }
+    return out; }
+  const mc = meshChunk; meshChunk = function (w, ch) { const r = mc.apply(this, arguments); try { ch.conn = connect(ch); } catch (e) { ch.conn = null; } G.cullDirty = true; return r; };
+  // ---------- caminhada a partir da câmera ----------
+  const tmp = new THREE.Vector3(); let lastKey = '', lastT = 0;
+  G.caveCull = true; G.caveStats = { shown: 0, total: 0 };
+  function walk() {
+    const w = G.world; if (!w) return; const cam = G.camera.getWorldPosition(tmp), R = (S.renderDist || 8) + 1;
+    const cx0 = Math.floor(cam.x) >> 4, cz0 = Math.floor(cam.z) >> 4, sy0 = Math.max(0, Math.min(NS - 1, Math.floor(cam.y) >> 4));
+    const seen = new Map(); // chave da coluna -> [min, max] dos pedaços vistos
+    const mark = (cx, s, cz) => { const k = ckey(cx, cz); const r = seen.get(k); if (!r) seen.set(k, [s, s]); else { if (s < r[0]) r[0] = s; if (s > r[1]) r[1] = s; } };
+    const done = new Set(), q = [[cx0, sy0, cz0, -1, 0]]; done.add(cx0 + ',' + sy0 + ',' + cz0); mark(cx0, sy0, cz0);
+    for (let h = 0; h < q.length; h++) { const [cx, s, cz, inF, dirs] = q[h]; const ch = w.chunks.get(ckey(cx, cz)), C = ch && ch.conn;
+      for (let f = 0; f < 6; f++) { if (dirs & (1 << (f ^ 1))) continue; // nunca voltar
+        if (inF >= 0 && C && !(C[s * 6 + inF] & (1 << f))) continue; // o ar não atravessa desse lado para esse
+        const nx = cx + FACE[f][0], ns = s + FACE[f][1], nz = cz + FACE[f][2]; if (ns < 0 || ns >= NS || Math.abs(nx - cx0) > R || Math.abs(nz - cz0) > R) continue;
+        const key = nx + ',' + ns + ',' + nz; if (done.has(key)) continue; done.add(key);
+        if (!w.chunks.has(ckey(nx, nz))) continue; mark(nx, ns, nz); q.push([nx, ns, nz, f ^ 1, dirs | (1 << f)]); } }
+    let shown = 0, total = 0;
+    for (const ch of w.chunks.values()) for (const k of ['mesh', 'wmesh', 'gmesh']) { const m = ch[k]; if (!m || !m.geometry) continue; const sec = m.geometry.userData.sec; if (!sec) continue; total++;
+      const r = seen.get(ckey(ch.cx, ch.cz)); if (!r || !ch.conn) { if (!ch.conn) { m.geometry.setDrawRange(0, Infinity); m.visible = true; shown++; } else m.visible = false; continue; }
+      const a = sec[r[0]], b = sec[r[1] + 1]; if (b <= a) { m.visible = false; continue; } m.visible = true; m.geometry.setDrawRange(a, b - a); shown++; }
+    G.caveStats.shown = shown; G.caveStats.total = total; }
+  function showAll() { const w = G.world; if (!w) return; for (const ch of w.chunks.values()) for (const k of ['mesh', 'wmesh', 'gmesh']) { const m = ch[k]; if (m && m.geometry) { m.visible = true; m.geometry.setDrawRange(0, Infinity); } } }
+  const tk = G.tick; G.tick = function (dt) { const r = tk.apply(this, arguments);
+    try { if (this.state === 'play' && this.world && this.camera) { if (!G.caveCull || (this.player && this.player.mode === 'spectator')) { if (G._ccOn) { showAll(); G._ccOn = false; } return r; }
+      const c = this.camera.getWorldPosition(tmp), key = (Math.floor(c.x) >> 4) + ',' + (Math.floor(c.y) >> 4) + ',' + (Math.floor(c.z) >> 4), now = performance.now();
+      if (key !== lastKey || G.cullDirty || now - lastT > 500) { lastKey = key; lastT = now; G.cullDirty = false; walk(); G._ccOn = true; } } } catch (e) { console.error(e); G.caveCull = false; showAll(); }
+    return r; };
+})();
+
 // ================= INVENTÁRIO CRIATIVO: GRUPOS QUE EXPANDEM (como no Bedrock) =================
 // Itens com muitas variações (escadas, lajes, cercas, vidros, painéis, lãs...) ficam num slot só.
 // Tocar no grupo abre as variações logo em seguida; tocar de novo fecha. Na pesquisa não agrupa.
