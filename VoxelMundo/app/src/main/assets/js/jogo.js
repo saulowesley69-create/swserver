@@ -8541,14 +8541,15 @@ body.touch #actbtn.show{display:block}`;
   ];
   // ---------- tela ----------
   const st = document.createElement('style'); st.textContent = `
-#chatbox{position:fixed!important;inset:0!important;left:0!important;right:0!important;bottom:0!important;z-index:60!important;pointer-events:none}
+#chatbox{position:fixed!important;inset:0!important;left:0!important;right:0!important;bottom:0!important;z-index:1500!important;pointer-events:auto!important;background:rgba(18,20,28,.32);-webkit-backdrop-filter:blur(7px) saturate(1.1);backdrop-filter:blur(7px) saturate(1.1)}
+#chatbox.hidden{display:none!important}
 #chatbox>*{pointer-events:auto}
 #chTop{position:absolute;top:calc(8px + env(safe-area-inset-top));left:calc(8px + env(safe-area-inset-left));right:calc(8px + env(safe-area-inset-right));height:44px;display:flex;align-items:center;background:#c6c6c6;border:2px solid #000;box-shadow:inset 2px 2px 0 #fff,inset -2px -2px 0 #8b8b8b;color:#333;font-size:24px}
 #chTop .tt{position:absolute;left:0;right:0;text-align:center;pointer-events:none}
 #chBack{position:relative;z-index:1;height:100%;display:flex;align-items:center;gap:8px;padding:0 12px;background:none;border:none;font:inherit;font-size:22px;color:#333;cursor:pointer}
 #chBack i{width:22px;height:22px;background:#3a3a3a;border:2px solid #000;display:inline-block;clip-path:polygon(0 50%,55% 0,55% 30%,100% 30%,100% 70%,55% 70%,55% 100%)}
 #chHist{position:absolute;left:calc(8px + env(safe-area-inset-left));top:calc(62px + env(safe-area-inset-top));bottom:calc(var(--kb,0px) + 66px);width:min(620px,70vw);overflow:auto;display:flex;flex-direction:column;justify-content:flex-end;font-size:20px;pointer-events:auto;scrollbar-width:thin}
-#chHist div{background:rgba(0,0,0,.5);padding:1px 8px;text-shadow:1px 1px #222;word-break:break-word}
+#chHist div{background:rgba(0,0,0,.28);padding:1px 8px;text-shadow:1px 1px #222;word-break:break-word}
 #chSug{position:absolute;z-index:2;left:calc(8px + env(safe-area-inset-left));bottom:calc(var(--kb,0px) + 64px);max-height:min(60vh,calc(100vh - var(--kb,0px) - 140px));width:min(640px,calc(100vw - 16px));overflow:auto;display:none;flex-direction:column;background:rgba(12,12,12,.94);border:2px solid #000}
 #chSug .hint{position:sticky;top:0;background:#141414;z-index:1;padding:5px 10px;color:#ffeb7a;font-size:19px;border-bottom:1px solid #444;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 #chSug .sg{padding:6px 10px;font-size:20px;color:#fff;cursor:pointer;display:flex;gap:10px;align-items:baseline;flex:none}
