@@ -1761,6 +1761,55 @@ window.TREES = (function () {
   window.SUNFLOWER = [241, 242];
 })();
 
+// ================= CORANTES (16), LÃ COLORIDA, CAMAS COLORIDAS E TESOURA =================
+// Ordem das cores (estado 1..16) — a mesma do vidro colorido:
+window.DYE_COLORS = [
+  ['white', 'Branco', 'White', [249, 255, 254]], ['orange', 'Laranja', 'Orange', [249, 128, 29]], ['magenta', 'Magenta', 'Magenta', [199, 78, 189]], ['light_blue', 'Azul-claro', 'Light Blue', [58, 179, 218]],
+  ['yellow', 'Amarelo', 'Yellow', [254, 216, 61]], ['lime', 'Verde-limão', 'Lime', [128, 199, 31]], ['pink', 'Rosa', 'Pink', [243, 139, 170]], ['gray', 'Cinza', 'Gray', [71, 79, 82]],
+  ['light_gray', 'Cinza-claro', 'Light Gray', [157, 157, 151]], ['cyan', 'Ciano', 'Cyan', [22, 156, 156]], ['purple', 'Roxo', 'Purple', [137, 50, 184]], ['blue', 'Azul', 'Blue', [60, 68, 170]],
+  ['brown', 'Marrom', 'Brown', [131, 84, 50]], ['green', 'Verde', 'Green', [94, 124, 22]], ['red', 'Vermelho', 'Red', [176, 46, 38]], ['black', 'Preto', 'Black', [29, 29, 33]]];
+window.DYE_IDX = {}; DYE_COLORS.forEach((c, i) => DYE_IDX[c[0]] = i + 1);
+window.DYE_TINT = DYE_COLORS.map(c => c[3].map(v => Math.max(0.12, v / 255)));
+// item de cada cor para blocos com estado (bloco -> [item por estado 1..16]); o estado 0 é o item normal do bloco
+window.STATE_ITEM = window.STATE_ITEM || {};
+(function () {
+  const EN0 = typeof EN !== 'undefined' ? EN : null;
+  let iid = Math.max(IT.length, 494);
+  // ---------- corantes ----------
+  const DROP = ['................', '................', '.......KK.......', '......KCCK......', '.....KCCCCK.....', '.....KCcCCK.....', '....KCcCCCCK....', '....KCCCCCCK....', '...KCCCCCCCCK...', '...KCCCCCCCdK...', '...KCCCCCCCdK...', '....KCCCCCdK....', '.....KKddKK.....', '.......KK.......', '................', '................'];
+  DYE_COLORS.forEach(([k, pt, en, c], i) => { const dk = k + '_dye'; const lite = c.map(v => Math.min(255, v + 70)), dark = c.map(v => v * 0.6 | 0);
+    defItem(iid++, dk, 'Corante ' + pt, { cat: 'materials', icon: () => fromRows(DROP, { K: [24, 18, 14], C: c, c: lite, d: dark }) }); if (EN0) EN0[dk] = en + ' Dye'; });
+  const D = k => k + '_dye';
+  // de onde vem cada cor (como no jogo original, adaptado ao que existe aqui)
+  shapeless(['bone_meal'], D('white')); shapeless(['oxeye_daisy'], D('light_gray')); shapeless(['coal'], D('black'));
+  shapeless(['poppy'], D('red')); shapeless(['orange_tulip'], D('orange')); shapeless(['dandelion'], D('yellow')); shapeless(['sunflower'], D('yellow'), 2);
+  shapeless(['cornflower'], D('blue')); shapeless(['lapis'], D('blue')); shapeless(['allium'], D('magenta')); shapeless(['pink_petals'], D('pink'));
+  smelt('cactus', D('green'));
+  // misturas
+  shapeless([D('red'), D('yellow')], D('orange'), 2); shapeless([D('black'), D('white')], D('gray'), 2); shapeless([D('gray'), D('white')], D('light_gray'), 2);
+  shapeless([D('green'), D('white')], D('lime'), 2); shapeless([D('blue'), D('green')], D('cyan'), 2); shapeless([D('blue'), D('white')], D('light_blue'), 2);
+  shapeless([D('red'), D('blue')], D('purple'), 2); shapeless([D('purple'), D('pink')], D('magenta'), 2); shapeless([D('red'), D('white')], D('pink'), 2); shapeless([D('red'), D('green')], D('brown'), 2);
+  // ---------- lã nas 16 cores ----------
+  // as 6 lãs antigas continuam sendo blocos próprios; as outras 10 são um bloco só com a cor guardada
+  const OLD = { white: 'wool_white', red: 'wool_red', blue: 'wool_blue', green: 'wool_green', yellow: 'wool_yellow', black: 'wool_black' };
+  const wb = defBlock(246, 'wool_dyed', 'Lã', { hard: 0.8, snd: 'wool', t: 'wool_white', creative: false, drop: 0 });
+  window.WOOL_ITEM = []; STATE_ITEM[246] = [];
+  const woolIcon = c => () => { const cv = document.createElement('canvas'); cv.width = cv.height = 32; const g = cv.getContext('2d'); const src = ICONS && IT[IID.wool_white] && IT[IID.wool_white].canvas; if (!src) return cv; g.drawImage(src, 0, 0, 32, 32); const d = g.getImageData(0, 0, 32, 32); for (let i = 0; i < d.data.length; i += 4) { d.data[i] = d.data[i] * c[0] / 255; d.data[i + 1] = d.data[i + 1] * c[1] / 255; d.data[i + 2] = d.data[i + 2] * c[2] / 255; } g.putImageData(d, 0, 0); return cv; };
+  DYE_COLORS.forEach(([k, pt, en, c], i) => { if (OLD[k]) { WOOL_ITEM[i] = IID[OLD[k]]; return; } const wk = 'wool_' + k; defItem(iid, wk, 'Lã ' + pt, { block: 246, st: i + 1, cat: 'blocks', icon: woolIcon(c) }); WOOL_ITEM[i] = iid; STATE_ITEM[246][i] = iid; iid++; if (EN0) EN0[wk] = en + ' Wool'; });
+  // tingir lã branca: corante + lã branca
+  DYE_COLORS.forEach(([k], i) => { if (k !== 'white') shapeless([D(k), 'wool_white'], IT[WOOL_ITEM[i]].key); });
+  // ---------- camas nas 16 cores (a vermelha é a cama normal) ----------
+  window.BED_ITEM = []; STATE_ITEM[BID.bed] = []; STATE_ITEM[BID.bed_foot] = [];
+  RECIPES.splice(0, RECIPES.length, ...RECIPES.filter(r => r.out !== IID.bed)); // a receita antiga aceitava qualquer lã
+  DYE_COLORS.forEach(([k, pt, en], i) => { let id; if (k === 'red') id = IID.bed; else { id = iid++; defItem(id, k + '_bed', 'Cama ' + pt, { block: BID.bed, st: i + 1, stack: 1, cat: 'blocks' }); if (EN0) EN0[k + '_bed'] = en + ' Bed'; }
+    BED_ITEM[i] = id; if (k !== 'red') { STATE_ITEM[BID.bed][i] = id; STATE_ITEM[BID.bed_foot][i] = id; }
+    shaped(['WWW', 'PPP'], { W: IT[WOOL_ITEM[i]].key, P: 'planks' }, IT[id].key); });
+  // ---------- tesoura ----------
+  defItem(iid++, 'shears', 'Tesoura', { stack: 1, dur: 238, shears: true, cat: 'tools', icon: () => fromRows(['................', '...........KK...', '..........KWWK..', '.........KWWK...', '....KK..KWWK....', '...KWWKKWWK.....', '....KWWWWK......', '.....KWWK.......', '....KRRKWK......', '...KRRK.KWK.....', '..KRRK...KK.....', '..KRK...KRRK....', '..KKK..KRRK.....', '......KRRK......', '......KKK.......', '................'], { K: [30, 24, 20], W: [215, 215, 220], R: [176, 46, 38] }) });
+  if (EN0) EN0.shears = 'Shears';
+  shaped([' I', 'I '], { I: 'iron_ingot' }, 'shears');
+})();
+
 // ================= VIDRO: vidro fino (painel), vidro colorido (16 cores) e painel colorido =================
 // Os coloridos são UM bloco cada (vidro colorido e painel colorido); a cor fica guardada no próprio bloco (estado 1..16),
 // do mesmo jeito que o tronco deitado guarda o eixo. No inventário cada cor é um item.
@@ -1795,7 +1844,7 @@ window.TREES = (function () {
     defItem(iid++, gk, 'Vidro ' + pt, { block: 244, st, cat: 'blocks', icon: tinted(st, false) });
     defItem(iid++, pk, 'Painel de Vidro ' + pt, { block: 245, st, cat: 'blocks', icon: tinted(st, true) });
     if (EN0) { EN0[gk] = en + ' Stained Glass'; EN0[pk] = en + ' Stained Glass Pane'; }
-    if (IID[ing] !== undefined) { shaped(['GGG', 'GDG', 'GGG'], { G: 'glass', D: ing }, gk, 8); shaped(['GGG', 'GDG', 'GGG'], { G: 'glass_pane', D: ing }, pk, 8); }
+    { const dye = IID[k + '_dye'] !== undefined ? k + '_dye' : ing; if (IID[dye] !== undefined) { shaped(['GGG', 'GDG', 'GGG'], { G: 'glass', D: dye }, gk, 8); shaped(['GGG', 'GDG', 'GGG'], { G: 'glass_pane', D: dye }, pk, 8); } }
     shaped(['GGG', 'GGG'], { G: gk }, pk, 16); });
   // item colorido de cada bloco+estado (para pegar o bloco certo)
   window.GLASS_ITEM = { 244: GLASS_COLORS.map(c => IID[c[0] + '_stained_glass']), 245: GLASS_COLORS.map(c => IID[c[0] + '_stained_glass_pane']) };
@@ -2099,7 +2148,7 @@ class World {
   setBlock(x, y, z, id, opts = {}) {
     if (y < 0 || y >= WH) return; const cx = x >> 4, cz = z >> 4; const c = this.chunks.get(ckey(cx, cz)); if (!c) return;
     const lx = x & 15, lz = z & 15, i = (y * 16 + lz) * 16 + lx; const old = c.data[i], oax = c.ax ? (c.ax.get(i) || 0) : 0, ax = AXIAL[id] ? (opts.ax !== undefined ? opts.ax : old === id ? oax : 0) : 0; if (old === id && ax === oax) return;
-    c.data[i] = id; if (ax) (c.ax || (c.ax = new Map())).set(i, ax); else if (oax) c.ax.delete(i); const k = ckey(cx, cz); (this.mods[k] || (this.mods[k] = {}))[i] = id + 256 * ax;
+    c.data[i] = id; if (oax && (old !== id || ax !== oax)) { const rm = this._stRm || (this._stRm = new Map()); if (rm.size > 64) rm.clear(); rm.set(x + ',' + y + ',' + z, [old, oax]); } if (ax) (c.ax || (c.ax = new Map())).set(i, ax); else if (oax) c.ax.delete(i); const k = ckey(cx, cz); (this.mods[k] || (this.mods[k] = {}))[i] = id + 256 * ax;
     // topo da coluna
     const ci = lz * 16 + lx;
     if (OPAQ[id] && y > c.top[ci]) c.top[ci] = y;
@@ -2166,7 +2215,7 @@ class World {
 function liqH(id, above) { if (LIQT[above] === LIQT[id]) return 1; const l = LVL[id]; if (l === 0 || l === 8) return 0.875; return Math.max(0.12, (8 - l) / 9); }
 // troncos deitados: o mesmo bloco, só guarda o eixo (1 = ao longo de X, 2 = ao longo de Z). Nas mudanças salvas fica id + 256*eixo.
 const AXIAL = new Uint8Array(256), LOGAX = new Uint8Array(256); for (const b of BL) if (b && /^(log|.+_log|crimson_stem|warped_stem|hay|basalt|void_pillar)$/.test(b.key)) AXIAL[b.id] = LOGAX[b.id] = 1;
-for (const k of ['stained_glass', 'stained_glass_pane']) if (BID[k] !== undefined) AXIAL[BID[k]] = 1; // estado = cor (1..16)
+for (const k of ['stained_glass', 'stained_glass_pane', 'wool_dyed', 'bed', 'bed_foot']) if (BID[k] !== undefined) AXIAL[BID[k]] = 1; // estado = cor (1..16)
 function applyMods(c, m) { const d = c.data; for (const i in m) { const v = m[i]; d[i] = v; if (c.ax) c.ax.delete(+i); if (v > 255) (c.ax || (c.ax = new Map())).set(+i, v >> 8); } }
 const FACES = [
   { d: [0, 1, 0], c: [[0, 1, 0], [0, 1, 1], [1, 1, 1], [1, 1, 0]], t: 'top', s: 1.0 },
@@ -2286,11 +2335,12 @@ function meshChunk(world, ch) {
       continue;
     }
     if (b.shape === 'bed') {
+      const bst = ch.ax ? (ch.ax.get((y * 16 + z) * 16 + x) || 0) : 0, btint = bst && window.DYE_TINT ? DYE_TINT[bst - 1] : null, BLK = btint ? T.wool_white : T.wool_red;
       const bd = world.bdata[(ch.cx * 16 + x) + ',' + y + ',' + (ch.cz * 16 + z)], f0 = bd && bd.f !== undefined ? bd.f : 2, sky = skyL(x, y, z), bl = lights.length ? blkL(x, y, z) : 0;
       const R = (u, v) => f0 === 2 ? [u, v] : f0 === 3 ? [1 - u, 1 - v] : f0 === 0 ? [v, 1 - u] : [1 - v, u];
-      const sbox = (a, q, t) => { const p0 = R(a[0] / 16, a[2] / 16), p1 = R(q[0] / 16, q[2] / 16), mn = [Math.min(p0[0], p1[0]), a[1] / 16, Math.min(p0[1], p1[1])], mx = [Math.max(p0[0], p1[0]), q[1] / 16, Math.max(p0[1], p1[1])]; for (let f = 0; f < 6; f++) { const F = FACES[f]; for (let k = 0; k < 4; k++) { const c = F.c[k]; verts[k] = [x + mn[0] + c[0] * (mx[0] - mn[0]), y + mn[1] + c[1] * (mx[1] - mn[1]), z + mn[2] + c[2] * (mx[2] - mn[2])]; uvs[k] = tileUV(t, FUV[k][0], f > 1 ? mn[1] + c[1] * (mx[1] - mn[1]) : FUV[k][1]); cols[k] = F.s; } pushQuad(S_, verts, uvs, cols, sky, bl, false); } };
-      if (id !== BID.bed_foot) { sbox([0.4, 3, 0], [15.6, 9, 14.5], T.wool_white); sbox([0, 3, 0], [16, 9.7, 6], T.wool_red); sbox([0, 3, 6], [16, 9.9, 7.6], T.wool_white); sbox([2.5, 9, 9.3], [13.5, 11.2, 13.8], T.quartz_block); sbox([0, 0, 14.5], [16, 15, 16], T.planks); sbox([1, 15, 14.5], [15, 16, 16], T.log_side); }
-      else { sbox([0.4, 3, 1.5], [15.6, 9, 16], T.wool_white); sbox([0, 3, 1.2], [16, 9.7, 16], T.wool_red); sbox([0, 0, 0], [16, 10.5, 1.5], T.planks); }
+      const sbox = (a, q, t, tn) => { const p0 = R(a[0] / 16, a[2] / 16), p1 = R(q[0] / 16, q[2] / 16), mn = [Math.min(p0[0], p1[0]), a[1] / 16, Math.min(p0[1], p1[1])], mx = [Math.max(p0[0], p1[0]), q[1] / 16, Math.max(p0[1], p1[1])]; for (let f = 0; f < 6; f++) { const F = FACES[f]; for (let k = 0; k < 4; k++) { const c = F.c[k]; verts[k] = [x + mn[0] + c[0] * (mx[0] - mn[0]), y + mn[1] + c[1] * (mx[1] - mn[1]), z + mn[2] + c[2] * (mx[2] - mn[2])]; uvs[k] = tileUV(t, FUV[k][0], f > 1 ? mn[1] + c[1] * (mx[1] - mn[1]) : FUV[k][1]); cols[k] = F.s; } pushQuad(S_, verts, uvs, cols, sky, bl, false, tn || null); } };
+      if (id !== BID.bed_foot) { sbox([0.4, 3, 0], [15.6, 9, 14.5], T.wool_white); sbox([0, 3, 0], [16, 9.7, 6], BLK, btint); sbox([0, 3, 6], [16, 9.9, 7.6], T.wool_white); sbox([2.5, 9, 9.3], [13.5, 11.2, 13.8], T.quartz_block); sbox([0, 0, 14.5], [16, 15, 16], T.planks); sbox([1, 15, 14.5], [15, 16, 16], T.log_side); }
+      else { sbox([0.4, 3, 1.5], [15.6, 9, 16], T.wool_white); sbox([0, 3, 1.2], [16, 9.7, 16], BLK, btint); sbox([0, 0, 0], [16, 10.5, 1.5], T.planks); }
       continue;
     }
     if (b.shape) {
@@ -2336,15 +2386,15 @@ function blockCubeGeo(id, size = 1, tint = null) {
 }
 
 // modelo 3D da cama inteira (cabeceira + pé), centrado na origem — usado na mão e no ícone
-function bedModelGeo(size = 1) {
+function bedModelGeo(size = 1, tint = null) {
   const A = newBuf(), s = size / 16, ox = -8, oz = -16, oy = -6;
-  const box = (a, q, t) => { const mn = [(a[0] + ox) * s, (a[1] + oy) * s, (a[2] + oz) * s], mx = [(q[0] + ox) * s, (q[1] + oy) * s, (q[2] + oz) * s];
-    for (let f = 0; f < 6; f++) { const F = FACES[f], vs = [], uv = []; for (let k = 0; k < 4; k++) { const c = F.c[k]; vs.push([mn[0] + c[0] * (mx[0] - mn[0]), mn[1] + c[1] * (mx[1] - mn[1]), mn[2] + c[2] * (mx[2] - mn[2])]); uv.push(tileUV(t, FUV[k][0], FUV[k][1])); } pushQuad(A, vs, uv, [F.s, F.s, F.s, F.s], 1, 0, false); } };
+  const BLK = tint ? T.wool_white : T.wool_red; const box = (a, q, t) => { const tn = t === BLK && tint ? tint : null; const mn = [(a[0] + ox) * s, (a[1] + oy) * s, (a[2] + oz) * s], mx = [(q[0] + ox) * s, (q[1] + oy) * s, (q[2] + oz) * s];
+    for (let f = 0; f < 6; f++) { const F = FACES[f], vs = [], uv = []; for (let k = 0; k < 4; k++) { const c = F.c[k]; vs.push([mn[0] + c[0] * (mx[0] - mn[0]), mn[1] + c[1] * (mx[1] - mn[1]), mn[2] + c[2] * (mx[2] - mn[2])]); uv.push(tileUV(t, FUV[k][0], FUV[k][1])); } pushQuad(A, vs, uv, [F.s, F.s, F.s, F.s], 1, 0, false, tn); } };
   // pé (z 0..16)
-  box([0.4, 3, 1.5], [15.6, 9, 16], T.wool_white); box([0, 3, 1.2], [16, 9.7, 16], T.wool_red); box([0, 0, 0], [16, 10.5, 1.5], T.planks);
+  box([0.4, 3, 1.5], [15.6, 9, 16], T.wool_white); box([0, 3, 1.2], [16, 9.7, 16], BLK); box([0, 0, 0], [16, 10.5, 1.5], T.planks);
   // cabeceira (z 16..32)
   const H = (a, q, t) => box([a[0], a[1], a[2] + 16], [q[0], q[1], q[2] + 16], t);
-  H([0.4, 3, 0], [15.6, 9, 14.5], T.wool_white); H([0, 3, 0], [16, 9.7, 6], T.wool_red); H([0, 3, 6], [16, 9.9, 7.6], T.wool_white); H([2.5, 9, 9.3], [13.5, 11.2, 13.8], T.quartz_block); H([0, 0, 14.5], [16, 15, 16], T.planks); H([1, 15, 14.5], [15, 16, 16], T.log_side);
+  H([0.4, 3, 0], [15.6, 9, 14.5], T.wool_white); H([0, 3, 0], [16, 9.7, 6], BLK); H([0, 3, 6], [16, 9.9, 7.6], T.wool_white); H([2.5, 9, 9.3], [13.5, 11.2, 13.8], T.quartz_block); H([0, 0, 14.5], [16, 15, 16], T.planks); H([1, 15, 14.5], [15, 16, 16], T.log_side);
   return bufToGeo(A);
 }
 // renderiza um ícone 3D (isométrico) num canvas 64x64
@@ -2973,7 +3023,7 @@ const MOB_BUILD = {
   pig(m) { const P = [240, 160, 160]; quad4Legs(m, 4, 6, 4, shade(P, 0.9), 3, 5, 6); mkPart(m, m.root, 10, 8, 16, P, 0, 10, 0); const h = mkPart(m, m.root, 8, 8, 8, P, 0, 12, -8, 0, 0, -4); m.head = h; mkPart(m, h, 4, 3, 1, [220, 120, 130], 0, -1.5, -8.5); eyes(m, h, 1.5, -8.05, 2.5, [20, 20, 20], true); },
   cow(m) { const C = [80, 55, 40], W = [235, 235, 230]; quad4Legs(m, 4, 12, 4, C, 4, 6.5, 12); const b = mkPart(m, m.root, 12, 10, 18, C, 0, 17, 0); mkPart(m, b, 12.3, 5, 6, W, 0, 1, 3); mkPart(m, b, 12.3, 4, 4, W, 0, -2, -5); const h = mkPart(m, m.root, 8, 8, 6, C, 0, 20, -9, 0, 0, -3); m.head = h; mkPart(m, h, 6, 3, 1, [200, 150, 140], 0, -2.5, -6.5); mkPart(m, h, 1, 3, 1, [220, 220, 200], -4.5, 4, -2); mkPart(m, h, 1, 3, 1, [220, 220, 200], 4.5, 4, -2); eyes(m, h, 1, -6.05, 2.5, [20, 20, 20], true); },
   chicken(m) { const W = [245, 245, 245], Y = [230, 180, 50]; for (const s of [-1.5, 1.5]) m.legs.push(mkPart(m, m.root, 1, 5, 1, Y, s, 5, 0, 0, -2.5, 0)); mkPart(m, m.root, 6, 6, 8, W, 0, 8, 0); m.wings = [mkPart(m, m.root, 1, 4, 6, W, -3.5, 10, 0, 0, -2, 0), mkPart(m, m.root, 1, 4, 6, W, 3.5, 10, 0, 0, -2, 0)]; const h = mkPart(m, m.root, 4, 6, 3, W, 0, 10, -4, 0, 2, -1.5); m.head = h; mkPart(m, h, 4, 2, 2, [240, 160, 40], 0, 2, -4); mkPart(m, h, 2, 2, 1.5, [210, 30, 30], 0, 0, -3.5); eyes(m, h, 3.5, -3.05, 1.5); },
-  sheep(m) { const W = [240, 240, 235], F = [200, 180, 160]; quad4Legs(m, 4, 10, 4, F, 3, 5, 10); mkPart(m, m.root, 11, 9, 15, W, 0, 15, 0); const h = mkPart(m, m.root, 6, 6, 8, F, 0, 17, -7, 0, 0, -3); m.head = h; mkPart(m, h, 7, 3, 5, W, 0, 2.5, -1); eyes(m, h, 1, -7.05, 1.7, [30, 30, 30], true); },
+  sheep(m) { const W = [240, 240, 235], F = [200, 180, 160]; quad4Legs(m, 4, 10, 4, F, 3, 5, 10); const wb = mkPart(m, m.root, 11, 9, 15, W, 0, 15, 0); m.woolMats = [m.mats[m.mats.length - 1]]; m.woolParts = [wb]; const h = mkPart(m, m.root, 6, 6, 8, F, 0, 17, -7, 0, 0, -3); m.head = h; m.woolParts.push(mkPart(m, h, 7, 3, 5, W, 0, 2.5, -1)); m.woolMats.push(m.mats[m.mats.length - 1]); eyes(m, h, 1, -7.05, 1.7, [30, 30, 30], true); },
   zombie(m) { const SK = [96, 128, 92], SH = [96, 72, 52], PA = [54, 54, 72]; for (const s of [-2, 2]) m.legs.push(mkPart(m, m.root, 4, 12, 4, PA, s, 12, 0, 0, -6, 0)); mkPart(m, m.root, 8, 12, 4, SH, 0, 18, 0); m.arms = [mkPart(m, m.root, 4, 12, 4, SK, -6, 22, 0, 0, -4, 0), mkPart(m, m.root, 4, 12, 4, SK, 6, 22, 0, 0, -4, 0)]; m.arms.forEach(a => a.rotation.x = Math.PI / 2); const h = mkPart(m, m.root, 8, 8, 8, SK, 0, 24, 0, 0, 4, 0); m.head = h; mkPart(m, h, 2, 1.5, 0.5, [20, 30, 20], -2, 4.5, -4.1); mkPart(m, h, 2, 1.5, 0.5, [20, 30, 20], 2, 4.5, -4.1); mkPart(m, h, 4, 1, 0.5, [50, 60, 45], 0, 1.5, -4.1); mkPart(m, h, 8.4, 2.5, 8.4, [60, 45, 30], 0, 7.2, 0); },
   skeleton(m) { const B = [215, 215, 205], D = [120, 120, 115]; for (const s of [-2, 2]) m.legs.push(mkPart(m, m.root, 2, 12, 2, B, s, 12, 0, 0, -6, 0)); const b = mkPart(m, m.root, 8, 12, 4, B, 0, 18, 0); for (const y of [-2, 1, 4]) mkPart(m, b, 8.2, 1, 4.2, D, 0, y, 0); m.arms = [mkPart(m, m.root, 2, 12, 2, B, -5, 22, 0, 0, -4, 0), mkPart(m, m.root, 2, 12, 2, B, 5, 22, 0, 0, -4, 0)]; m.arms.forEach(a => a.rotation.x = Math.PI / 2); mkPart(m, m.arms[1], 1, 10, 1, [110, 80, 45], 0, -10, -1.5); const h = mkPart(m, m.root, 8, 8, 8, B, 0, 24, 0, 0, 4, 0); m.head = h; mkPart(m, h, 2, 2, 0.5, [25, 25, 25], -2, 4.5, -4.1); mkPart(m, h, 2, 2, 0.5, [25, 25, 25], 2, 4.5, -4.1); mkPart(m, h, 4, 1, 0.5, [60, 60, 60], 0, 1.5, -4.1); },
   dark_skeleton(m) { const B = [48, 48, 52], D = [25, 25, 28]; for (const s of [-2, 2]) m.legs.push(mkPart(m, m.root, 2, 14, 2, B, s, 14, 0, 0, -7, 0)); const b = mkPart(m, m.root, 8, 13, 4, B, 0, 20.5, 0); for (const y of [-2, 1, 4]) mkPart(m, b, 8.2, 1, 4.2, D, 0, y, 0); m.arms = [mkPart(m, m.root, 2, 14, 2, B, -5, 26, 0, 0, -5, 0), mkPart(m, m.root, 2, 14, 2, B, 5, 26, 0, 0, -5, 0)]; m.arms.forEach(a => a.rotation.x = Math.PI / 2); mkPart(m, m.arms[1], 1.5, 12, 1, [120, 120, 125], 0, -14, -1.5); mkPart(m, m.arms[1], 4, 1, 1.5, [70, 50, 30], 0, -9, -1.5); const h = mkPart(m, m.root, 8, 8, 8, B, 0, 27, 0, 0, 4, 0); m.head = h; mkPart(m, h, 2, 2, 0.5, [255, 90, 30], -2, 4.5, -4.1); mkPart(m, h, 2, 2, 0.5, [255, 90, 30], 2, 4.5, -4.1); mkPart(m, h, 4, 1, 0.5, [15, 15, 15], 0, 1.5, -4.1); },
@@ -3289,9 +3339,11 @@ MOB_BUILD.cow = function (m) {
 };
 MOB_BUILD.sheep = function (m) {
   const W = [240, 238, 230], W2 = [224, 222, 212], F = [212, 186, 162], F2 = [150, 120, 104];
-  quad4Legs(m, 3, 10, 3, F, 3.2, 5, 10); hooves(m, 3, -9.2, [70, 55, 50]); for (const [x, z] of [[-3.2, -5], [3.2, -5], [-3.2, 5], [3.2, 5]]) mkPart(m, m.root, 4.8, 7, 5.4, W, x, 9.1, z); // lã das pernas presa ao corpo (não balança com a perna)
-  mkPart(m, m.root, 11, 9, 15, W, 0, 15, 0); mkPart(m, m.root, 12.6, 6.5, 11, W2, 0, 15.2, 0.5); mkPart(m, m.root, 8.5, 2, 12, W2, 0, 20.2, 0); mkPart(m, m.root, 9, 6, 2, W2, 0, 15, 8.2); mkPart(m, m.root, 3, 3, 2, W, 0, 17, 9.4);
-  const h = mkPart(m, m.root, 6, 6, 8, F, 0, 17, -7, 0, 0, -3); m.head = h; mkPart(m, h, 7.2, 3.8, 6, W, 0, 2.4, -1.4); mkPart(m, h, 2.2, 1.2, 0.5, F2, 0, -1.2, -7.1);
+  m.woolMats = []; m.woolParts = []; const wl = (g, f) => { const mt = m.mats[m.mats.length - 1]; mt.userData.wf = f; m.woolMats.push(mt); m.woolParts.push(g); return g; }; // partes de lã (cor e tosa)
+  quad4Legs(m, 3, 10, 3, F, 3.2, 5, 10); hooves(m, 3, -9.2, [70, 55, 50]); for (const [x, z] of [[-3.2, -5], [3.2, -5], [-3.2, 5], [3.2, 5]]) wl(mkPart(m, m.root, 4.8, 7, 5.4, W, x, 9.1, z), 1); // lã das pernas presa ao corpo (não balança com a perna)
+  mkPart(m, m.root, 10.2, 8.4, 14.2, F, 0, 15, 0); // pele por baixo (aparece quando tosada)
+  wl(mkPart(m, m.root, 11, 9, 15, W, 0, 15, 0), 1); wl(mkPart(m, m.root, 12.6, 6.5, 11, W2, 0, 15.2, 0.5), 0.93); wl(mkPart(m, m.root, 8.5, 2, 12, W2, 0, 20.2, 0), 0.93); wl(mkPart(m, m.root, 9, 6, 2, W2, 0, 15, 8.2), 0.93); wl(mkPart(m, m.root, 3, 3, 2, W, 0, 17, 9.4), 1);
+  const h = mkPart(m, m.root, 6, 6, 8, F, 0, 17, -7, 0, 0, -3); m.head = h; wl(mkPart(m, h, 7.2, 3.8, 6, W, 0, 2.4, -1.4), 1); mkPart(m, h, 2.2, 1.2, 0.5, F2, 0, -1.2, -7.1);
   for (const s of [-1, 1]) { const e = mkPart(m, h, 2.6, 1.4, 1.4, F2, s * 4, 0.6, -1.5); e.rotation.z = s * 0.35; }
   eyes(m, h, 0.8, -7.05, 1.8, [30, 30, 30], true);
 };
@@ -4674,7 +4726,7 @@ const G = {
     const ents = (this.pendingEnts || []).slice();
     for (const e of this.entities) { if (ents.length >= 160) break; if (e.dead || e.dying || (Math.hypot(e.pos.x - p.pos.x, e.pos.z - p.pos.z) > 72 && !e.tame && !(e instanceof Boat))) continue; const P = [+e.pos.x.toFixed(2), +e.pos.y.toFixed(2), +e.pos.z.toFixed(2)];
       if (e instanceof ItemDrop) ents.push({ t: '#item', p: P, s: e.stack, l: Math.round(e.life) });
-      else if (e instanceof Mob && [Mob, Fish, Rabbit, Bat, Slime, Wolf, Horse, Boat, window.Minecart].includes(e.constructor) && MOB_TYPES[e.type]) ents.push({ t: e.type, p: P, hp: e.hp, z: e.size, y: +e.yaw.toFixed(2), x: e.saveX ? e.saveX() : undefined }); }
+      else if (e instanceof Mob && [Mob, Fish, Rabbit, Bat, Slime, Wolf, Horse, Boat, window.Minecart].includes(e.constructor) && MOB_TYPES[e.type]) ents.push({ t: e.type, p: P, hp: e.hp, z: e.size, y: +e.yaw.toFixed(2), x: e.saveX ? e.saveX() : undefined }); else if (e instanceof Mob && e.constructor === window.Sheep) ents.push({ t: e.type, p: P, hp: e.hp, y: +e.yaw.toFixed(2), x: e.saveX() }); }
     data.vchest = this.vchest || null; data.player.effects = p.effects || {}; data.player.adv = p.adv || {}; data.player.attrs = p.attrs || {}; data.player.absorb = p.absorb || 0; data.ents = ents; data.raining = !!this.raining; data.weatherT = this.weatherT; data.player.air = p.air; data.player.fallDist = p.fallDist;
     this.persistWorld(data);
   },
@@ -5229,7 +5281,7 @@ const G = {
       w.setBlock(x, y, z, bedDir !== null ? BID.bed_foot : it.block, { ax: it.st ? it.st : LOGAX[it.block] && t.n[1] === 0 ? (t.n[0] ? 1 : 2) : 0 });
       if (nb.torch && t.n[1] === 0 && SOLID[t.id] && !BL[t.id].replace) { w.bdata[x + ',' + y + ',' + z] = { tw: [-t.n[0], -t.n[2]] }; w.markDirty(x >> 4, z >> 4); }
       if (nb.shape === 'panel' && t.n[1] === 0) { w.bdata[x + ',' + y + ',' + z] = { f: t.n[0] === -1 ? 0 : t.n[0] === 1 ? 1 : t.n[2] === -1 ? 2 : 3 }; w.markDirty(x >> 4, z >> 4); }
-      if (bedDir !== null) { const D = BED_DIRS[bedDir]; w.bdata[x + ',' + y + ',' + z] = { f: bedDir }; w.setBlock(x + D[0], y, z + D[1], BID.bed, { noUpdate: true }); w.bdata[(x + D[0]) + ',' + y + ',' + (z + D[1])] = { f: bedDir }; w.markDirty(x >> 4, z >> 4); w.markDirty((x + D[0]) >> 4, (z + D[1]) >> 4); }
+      if (bedDir !== null) { const D = BED_DIRS[bedDir]; w.bdata[x + ',' + y + ',' + z] = { f: bedDir }; w.setBlock(x + D[0], y, z + D[1], BID.bed, { noUpdate: true, ax: it.st || 0 }); w.bdata[(x + D[0]) + ',' + y + ',' + (z + D[1])] = { f: bedDir }; w.markDirty(x >> 4, z >> 4); w.markDirty((x + D[0]) >> 4, (z + D[1]) >> 4); }
       if (nb.shape === 'door') { const f = this.facingFromPlayer(); w.bdata[x + ',' + y + ',' + z] = { f }; w.setBlock(x, y + 1, z, it.block, { noUpdate: true }); w.bdata[x + ',' + (y + 1) + ',' + z] = { f }; w.markDirty(x >> 4, z >> 4); }
       if (nb.facing) { const d = { f: this.facingFromPlayer() }; if (nb.interact === 'chest') { d.t = 'chest'; d.items = new Array(27).fill(null); } if (nb.interact === 'furnace') { d.t = 'furnace'; d.items = [null, null, null]; d.burn = 0; d.burnMax = 0; d.cook = 0; } w.bdata[x + ',' + y + ',' + z] = d; w.markDirty(x >> 4, z >> 4); }
       Snd.mat(nb.snd, 0.7, 'place'); this.swing = 1; if (it.block === BID.end_frame) this.tryEndPortal(x, y, z);
@@ -7577,6 +7629,7 @@ MOB_CLASS.villager = function (x, y, z) { return new Villager(x, y, z, Math.floo
       case 'held': { const p = G.player; if (p) { p.held = o.s; UI.dirtyHotbar = true; } break; }
       case 'chat': UI.chat(o.m, o.c); break;
       case 'bolt': if (G.strike && Array.isArray(o.p)) G.strike(+o.p[0], +o.p[2], +o.p[1], true); break;
+      case 'sx': { const pp = NET.puppets.get(o.i); if (pp && pp.loadX && o.x) try { pp.loadX(o.x); } catch (e) { } break; }
       case 'deny': NET.denied = o.r; break;
       case 'kpk': if (window.kitReward) kitReward(); break;
       case 'bye': if (peer.open) { peer.open = false; onClose(peer); } break;
@@ -8456,7 +8509,7 @@ body.touch #actbtn.show{display:block}`;
     ['sapling', 'Mudas', 'Saplings', k => /sapling$/.test(k)], ['glass_pane', 'Painéis de Vidro', 'Glass Panes', k => /glass_pane$/.test(k)],
     ['glass', 'Vidros', 'Glass', k => k === 'glass' || /_stained_glass$/.test(k)], ['wool', 'Lãs', 'Wool', k => /^wool_/.test(k)],
     ['carpet', 'Tapetes', 'Carpets', k => /carpet/.test(k)], ['terracotta', 'Terracotas', 'Terracotta', k => /terracotta/.test(k)],
-    ['flower', 'Flores', 'Flowers', k => FLOWERS.has(k)], ['ore', 'Minérios', 'Ores', k => /_ore$/.test(k)],
+    ['flower', 'Flores', 'Flowers', k => FLOWERS.has(k)], ['dye', 'Corantes', 'Dyes', k => /_dye$/.test(k)], ['ore', 'Minérios', 'Ores', k => /_ore$/.test(k)],
     ['plate', 'Placas de Pressão', 'Pressure Plates', k => /pressure_plate|_plate$/.test(k) && !/chestplate/.test(k)], ['button', 'Botões', 'Buttons', k => /button$/.test(k)],
     ['bed', 'Camas', 'Beds', k => /(^bed$|_bed$)/.test(k)], ['boat', 'Barcos', 'Boats', k => /boat$/.test(k)],
     ['helmet', 'Capacetes', 'Helmets', k => /_helmet$/.test(k)], ['chest', 'Peitorais', 'Chestplates', k => /_(chest|chestplate)$/.test(k)],
@@ -8724,6 +8777,53 @@ body.chopen #touchui,body.chopen #chatlog,body.chopen #itemname,body.chopen #hot
   cv.addEventListener('touchstart', () => { if (G.worldLocked()) G.needLift = true; else G.needLift = false; }, { passive: true, capture: true });
   // perder o foco (trocar de app, notificação) solta tudo
   window.addEventListener('blur', () => clearActs(G)); document.addEventListener('visibilitychange', () => { if (document.hidden) clearActs(G); });
+})();
+
+// ================= OVELHAS COLORIDAS + TESOURA + CORANTE NA OVELHA + LÃ QUE VOLTA =================
+// Cores ao nascer como no jogo original: quase todas brancas; algumas cinza-claro, cinza, pretas e marrons; rosa é raríssima.
+(function () {
+  const pick = () => { const r = Math.random() * 100; return r < 81.836 ? 1 : r < 86.836 ? 9 : r < 91.836 ? 8 : r < 96.836 ? 16 : r < 99.836 ? 13 : 7; };
+  const SKIN = [200, 180, 160];
+  class Sheep extends Mob {
+    constructor(x, y, z) { super('sheep', x, y, z); this.col = pick(); this.sheared = false; this.grazeT = 20 + Math.random() * 40; this.applyWool(); }
+    applyWool() { const c = DYE_COLORS[(this.col || 1) - 1][3], m = this.m; if (!m || !m.woolMats) return;
+      for (const mat of m.woolMats) { const f = mat.userData.wf || 1; mat.color.copy(col3(c.map(v => v * f))); mat.userData.base = mat.color.clone(); } this._t = null;
+      for (const g of m.woolParts) g.visible = !this.sheared; // tosada: só a pele aparece
+      this.T = Object.assign({}, MOB_TYPES.sheep, { drops: [[IT[WOOL_ITEM[this.col - 1]].key, this.sheared ? 0 : 1, this.sheared ? 0 : 1], ['mutton', 1, 2]] }); }
+    saveX() { return { c: this.col, s: this.sheared ? 1 : 0 }; }
+    loadX(d) { if (d.c) this.col = d.c; this.sheared = !!d.s; this.applyWool(); }
+    sync() { if (window.NETX && NETX.isHost() && this.nid) NETX.toAll({ t: 'sx', i: this.nid, x: this.saveX() }); }
+    update(dt) { const r = super.update(dt); if (this.sheared && !this.dead && !this.puppet) { this.grazeT -= dt; if (this.grazeT <= 0) { this.grazeT = 20 + Math.random() * 40; const w = G.world, x = Math.floor(this.pos.x), y = Math.floor(this.pos.y - 0.2), z = Math.floor(this.pos.z);
+      // come a grama embaixo (ou o capim) e a lã volta
+      if (w.getBlock(x, y + 1, z) === BID.tallgrass) w.setBlock(x, y + 1, z, 0); else if (w.getBlock(x, y, z) === BID.grass) w.setBlock(x, y, z, BID.dirt); else return r;
+      if (this.m && this.m.head) { this.eatT = 1; } this.sheared = false; this.applyWool(); this.sync(); } } return r; }
+  }
+  window.Sheep = Sheep; MOB_CLASS.sheep = Sheep;
+  // ---------- usar tesoura / corante na ovelha ----------
+  const use0 = G.use; G.use = function () {
+    const e = this.entTarget, p = this.player, s = p && p.held, it = s ? IT[s.id] : null;
+    if (e instanceof Sheep && !e.dead && it && !(window.NETX && NETX.isClient() && e.puppet)) {
+      if (it.shears && !e.sheared) { e.sheared = true; e.applyWool(); e.sync(); const n = 1 + Math.floor(Math.random() * 3); dropItem(e.pos.x, e.pos.y + 1, e.pos.z, WOOL_ITEM[e.col - 1], n); if (p.mode !== 'creative') p.damageTool(1); Snd.play('mat_wool', 0.8); this.swing = 1; UI.dirtyHotbar = true; return; }
+      const dm = /^(.+)_dye$/.exec(it.key); if (dm && DYE_IDX[dm[1]] && DYE_IDX[dm[1]] !== e.col) { e.col = DYE_IDX[dm[1]]; e.applyWool(); e.sync(); if (p.mode !== 'creative') { s.c--; if (!s.c) p.held = null; } Particles.spawn(e.pos.x, e.pos.y + 1, e.pos.z, DYE_COLORS[e.col - 1][3].map(v => v / 255), 8, 1, 0.5, -1, 0.3); this.swing = 1; UI.dirtyHotbar = true; return; } }
+    return use0.apply(this, arguments);
+  };
+  // ---------- quebrar bloco colorido devolve o item da cor certa ----------
+  const df = G.dropsFor; G.dropsFor = function (x, y, z, id, player) {
+    const w = this.world, rm = w && w._stRm, k = x + ',' + y + ',' + z, st = rm && rm.get(k); if (rm) rm.delete(k);
+    if (st && st[0] === id && STATE_ITEM[id] && STATE_ITEM[id][st[1] - 1]) { dropItem(x + 0.5, y + 0.5, z + 0.5, STATE_ITEM[id][st[1] - 1], 1); return; }
+    // tesoura nas folhas: as folhas caem inteiras
+    const h = player && this.player && this.player.held; if (h && IT[h.id] && IT[h.id].shears && BL[id] && /leaves/.test(BL[id].key)) { dropItem(x + 0.5, y + 0.5, z + 0.5, id, 1); return; }
+    return df.apply(this, arguments); };
+  // a cama colorida: a receita da cama solta (qualquer lã) não existe mais; o vidro usa corante
+  // pegar bloco (botão do meio) pega a cor certa
+  const pb = G.pickBlock; G.pickBlock = function () { const t = this.target, w = this.world; if (t && w && w.getAxis && STATE_ITEM[t.id]) { const st = w.getAxis(t.x, t.y, t.z), iid = st && STATE_ITEM[t.id][st - 1]; if (iid) { const p = this.player; const i = p.inv.findIndex((q, j) => j < 9 && q && q.id === iid); if (i >= 0) p.sel = i; else if (p.mode === 'creative') p.inv[p.sel] = { id: iid, c: 1 }; UI.dirtyHotbar = true; return; } } return pb.apply(this, arguments); };
+  // tesoura quebra lã e folhas rápido
+  const bt = G.breakTime; G.breakTime = function (id) { const r = bt.apply(this, arguments), h = this.player && this.player.held; if (h && IT[h.id] && IT[h.id].shears && BL[id] && /leaves|wool/.test(BL[id].key)) return r / 6; return r; };
+  // ícones das camas coloridas
+  const mkBedIcons = () => { if (!G.matSolid || !window.render3DIcon) return; DYE_COLORS.forEach((c, i) => { const id = BED_ITEM[i]; if (id === IID.bed) return; const cv = render3DIcon(bedModelGeo(1, DYE_TINT[i]), G.matSolid, 1.05); if (cv) { IT[id].canvas = cv; ICONS[id] = cv.toDataURL(); } }); };
+  try { mkBedIcons(); } catch (e) { console.error(e); }
+  // pintar os blocos colocados do item com cor (cama: os dois pedaços já levam a cor pelo estado)
+  window.WOOL_COLOR_OF = it => it && it.st;
 })();
 
 // ================= REGRA GLOBAL: criatura só nasce onde cabe inteira (largura x altura) =================
