@@ -5338,10 +5338,10 @@ const G = {
     const a = v.slice(1).split(/\s+/), c = a[0].toLowerCase(), p = this.player; const ok = m => UI.chat(m, '#aaa'), err = m => UI.chat(m, '#f66');
     const num = (s, base) => s === undefined ? NaN : s[0] === '~' ? base + (parseFloat(s.slice(1)) || 0) : parseFloat(s);
     switch (c) {
-      case 'help': ok('Comandos: /gamemode <survival|creative|spectator>, /time set <day|night|noon|midnight|n>, /tp x y z, /give <item> [n], /summon <mob>, /attribute <atributo> base set <valor>, /kill, /heal, /feed, /seed, /clear, /xp <n>, /spawnpoint, /difficulty <peaceful|easy|normal|hard>, /weather, /items, /mobs, /dimension <superficie|abismo|vazio>, /pvp [quantidade] [nível 0-3], /pvp kit, /pvp stop, /locate <vila|masmorra|navio>'); break;
-      case 'gamemode': case 'gm': { const m = { survival: 'survival', s: 'survival', 0: 'survival', sobrevivencia: 'survival', creative: 'creative', c: 'creative', 1: 'creative', criativo: 'creative', spectator: 'spectator', sp: 'spectator', 3: 'spectator', espectador: 'spectator' }[(a[1] || '').toLowerCase()]; if (!m) return err('Uso: /gamemode <survival|creative|spectator>'); p.mode = m; p.flying = m === 'spectator'; UI.dirtyBars = true; ok('Modo de jogo alterado para ' + { survival: 'Sobrevivência', creative: 'Criativo', spectator: 'Espectador' }[m]); break; }
-      case 'time': { const t = { day: 1000, dia: 1000, noon: 6000, night: 13000, noite: 13000, midnight: 18000, sunrise: 23500, sunset: 12000 }; if (a[1] === 'set') { const v2 = t[a[2]] !== undefined ? t[a[2]] : parseInt(a[2]); if (isNaN(v2)) return err('Uso: /time set <day|night|n>'); this.time = ((v2 % 24000) + 24000) % 24000; ok('Hora definida para ' + this.time); } else if (a[1] === 'add') { this.time = (this.time + (parseInt(a[2]) || 0)) % 24000; ok('Hora: ' + Math.floor(this.time)); } else ok('Hora atual: ' + Math.floor(this.time)); break; }
-      case 'tp': case 'teleport': { const x = num(a[1], p.pos.x), y = num(a[2], p.pos.y), z = num(a[3], p.pos.z); if ([x, y, z].some(isNaN)) return err('Uso: /tp x y z'); p.pos.set(x, y, z); p.vel.set(0, 0, 0); p.fallDist = 0; ok(`Teleportado para ${x.toFixed(1)}, ${y.toFixed(1)}, ${z.toFixed(1)}`); break; }
+      case 'help': ok((S.lang === 'en' ? 'Commands: ' : 'Comandos: ') + '/gamemode <survival|creative|spectator>, /time set <day|noon|night|midnight|n>, /weather <clear|rain|thunder>, /tp <x> <y> <z>, /give <item> [amount], /summon <mob>, /attribute @s <attribute> base set <value>, /kill [@e], /heal, /feed, /seed, /clear, /xp <n> [levels], /spawnpoint, /fly, /difficulty <peaceful|easy|normal|hard>, /items, /mobs, /dimension <overworld|nether|end>, /locate <village|dungeon|shipwreck|mansion|mineshaft|fortress|bastion>, /lightning, /pvp [1-8] [0-3] | kit | stop, /players'); break;
+      case 'gamemode': case 'gm': { const m = { survival: 'survival', s: 'survival', 0: 'survival', sobrevivencia: 'survival', creative: 'creative', c: 'creative', 1: 'creative', criativo: 'creative', spectator: 'spectator', sp: 'spectator', 3: 'spectator', espectador: 'spectator' }[(a[1] || '').toLowerCase()]; if (!m) return err((S.lang === 'en' ? 'Usage: ' : 'Uso: ') + '/gamemode <survival|creative|spectator>'); p.mode = m; p.flying = m === 'spectator'; UI.dirtyBars = true; ok('Modo de jogo alterado para ' + { survival: 'Sobrevivência', creative: 'Criativo', spectator: 'Espectador' }[m]); break; }
+      case 'time': { const t = { day: 1000, dia: 1000, noon: 6000, night: 13000, noite: 13000, midnight: 18000, sunrise: 23500, sunset: 12000 }; if (a[1] === 'set') { const v2 = t[a[2]] !== undefined ? t[a[2]] : parseInt(a[2]); if (isNaN(v2)) return err((S.lang === 'en' ? 'Usage: ' : 'Uso: ') + '/time set <day|noon|night|midnight|n>'); this.time = ((v2 % 24000) + 24000) % 24000; ok('Hora definida para ' + this.time); } else if (a[1] === 'add') { this.time = (this.time + (parseInt(a[2]) || 0)) % 24000; ok('Hora: ' + Math.floor(this.time)); } else ok('Hora atual: ' + Math.floor(this.time)); break; }
+      case 'tp': case 'teleport': { const x = num(a[1], p.pos.x), y = num(a[2], p.pos.y), z = num(a[3], p.pos.z); if ([x, y, z].some(isNaN)) return err((S.lang === 'en' ? 'Usage: ' : 'Uso: ') + '/tp <x> <y> <z>'); p.pos.set(x, y, z); p.vel.set(0, 0, 0); p.fallDist = 0; ok(`Teleportado para ${x.toFixed(1)}, ${y.toFixed(1)}, ${z.toFixed(1)}`); break; }
       case 'give': { const key = (a[1] || ''); const id = IID[key]; if (id === undefined) return err('Item desconhecido. Use /items para ver a lista.'); const n = parseInt(a[2]) || 1; p.give({ id, c: Math.min(n, 64 * 36) }); ok(`Dado ${n} × ${IT[id].name}`); break; }
       case 'items': ok(IT.filter(i => i).map(i => i.key).join(', ')); break;
       case 'mobs': ok(Object.keys(MOB_TYPES).join(', ')); break;
@@ -5352,7 +5352,7 @@ const G = {
         if (!rest.length || rest.includes('get')) return ok(nm + ' = ' + +p.attr(nm).toFixed(4) + ' (padrão ' + D[0] + ')');
         if (rest.includes('reset')) { delete p.attrs[nm]; UI.dirtyBars = true; return ok(nm + (S.lang === 'en' ? ' reset to default (' : ' voltou ao padrão (') + D[0] + ')'); }
         const v = parseFloat(rest[rest.length - 1]); if (isNaN(v)) return err(S.lang === 'en' ? 'Invalid value. E.g.: /attribute @s scale base set 2' : 'Valor inválido. Ex.: /attribute @s scale base set 2');
-        const val = clamp(v, D[1], D[2]); p.attrs[nm] = val; if (nm === 'max_health' && p.health > val) p.health = val; UI.dirtyBars = true; return ok(nm + ' definido para ' + val + (val !== v ? ' (limite ' + D[1] + ' a ' + D[2] + ')' : '')); }
+        const val = clamp(v, D[1], D[2]); p.attrs[nm] = val; if (nm === 'max_health' && p.health > val) p.health = val; UI.dirtyBars = true; return ok(nm + (S.lang === 'en' ? ' set to ' : ' definido para ') + val + (val !== v ? ' (limite ' + D[1] + ' a ' + D[2] + ')' : '')); }
       case 'summon': { const tp = (a[1] || ''); if (!MOB_TYPES[tp]) return err('Mob desconhecido: ' + Object.keys(MOB_TYPES).join(', ')); const d = this.lookDir(); const x = num(a[2], p.pos.x + d.x * 3), y = num(a[3], p.pos.y), z = num(a[4], p.pos.z + d.z * 3); this.entities.push(makeMob(tp, x, y, z)); ok('Invocado: ' + MOB_TYPES[tp].name); break; }
       case 'kill': if (a[1] === '@e') { let n = 0; for (const e of this.entities) if (e instanceof Mob) { e.remove(); n++; } ok(n + ' entidades removidas'); } else { p.health = 0; p.die('kill'); } break;
       case 'heal': p.health = 20; UI.dirtyBars = true; ok('Vida restaurada'); break;
@@ -5362,13 +5362,13 @@ const G = {
       case 'xp': case 'experience': { const n = parseInt(a[1]) || 0; if ((a[2] || '').toLowerCase().startsWith('l')) { p.level += n; Snd.play('levelup'); } else p.addXP(n); UI.dirtyBars = true; ok('XP adicionado'); break; }
       case 'spawnpoint': p.spawn = { x: p.pos.x, y: p.pos.y, z: p.pos.z }; ok('Ponto de renascimento definido'); break;
       case 'difficulty': { const m = { peaceful: 0, pacifico: 0, easy: 1, facil: 1, normal: 2, hard: 3, dificil: 3 }[(a[1] || '').toLowerCase()]; if (m === undefined) return ok('Dificuldade: ' + ['Pacífico', 'Fácil', 'Normal', 'Difícil'][this.difficulty]); this.difficulty = m; if (m === 0) for (const e of this.entities) if (e instanceof Mob && e.T.hostile) e.remove(); ok('Dificuldade: ' + ['Pacífico', 'Fácil', 'Normal', 'Difícil'][m]); break; }
-      case 'weather': case 'clima': { const v = (a[1] || '').toLowerCase(); if (['rain', 'chuva', 'snow', 'neve'].includes(v)) { this.raining = true; this.weatherT = 200; ok('Clima: chuva'); } else if (['clear', 'limpo', 'sol'].includes(v)) { this.raining = false; this.weatherT = 600; ok('Clima: céu limpo'); } else err('Uso: /weather <clear|rain>'); break; }
-      case 'dimension': case 'dimensao': case 'abismo': case 'superficie': case 'vazio': { const AL = { abismo: 'nether', nether: 'nether', superficie: 'overworld', overworld: 'overworld', vazio: 'end', end: 'end' }; const to = AL[c] || AL[(a[1] || '').toLowerCase()] || ''; if (!['nether', 'overworld', 'end'].includes(to)) return err('Uso: /dimension <superficie|abismo|vazio>'); if (to === this.dim) return ok('Você já está aí.'); this.switchDim(to); break; }
+      case 'weather': case 'clima': { const v = (a[1] || '').toLowerCase(); if (['rain', 'chuva', 'snow', 'neve'].includes(v)) { this.raining = true; this.weatherT = 200; ok('Clima: chuva'); } else if (['clear', 'limpo', 'sol'].includes(v)) { this.raining = false; this.weatherT = 600; ok('Clima: céu limpo'); } else err((S.lang === 'en' ? 'Usage: ' : 'Uso: ') + '/weather <clear|rain|thunder>'); break; }
+      case 'dimension': case 'dimensao': case 'abismo': case 'superficie': case 'vazio': { const AL = { abismo: 'nether', nether: 'nether', superficie: 'overworld', overworld: 'overworld', vazio: 'end', end: 'end' }; const to = AL[c] || AL[(a[1] || '').toLowerCase()] || ''; if (!['nether', 'overworld', 'end'].includes(to)) return err((S.lang === 'en' ? 'Usage: ' : 'Uso: ') + '/dimension <overworld|nether|end>'); if (to === this.dim) return ok('Você já está aí.'); this.switchDim(to); break; }
       case 'pvp': {
         if (a[1] === 'kit') { this.pvpKit(); ok('Kit de PvP entregue'); break; }
         if (a[1] === 'stop' || a[1] === 'parar') { let n = 0; for (const e of this.entities) if (e instanceof Fighter) { e.remove(); n++; } ok(n + ' lutadores removidos'); break; }
         const n = clamp(parseInt(a[1]) || 1, 1, 8), tr = a[2] !== undefined ? clamp(parseInt(a[2]) || 0, 0, 3) : undefined; if (p.mode !== 'survival') err('Dica: os bots só atacam no modo Sobrevivência (/gamemode survival)'); this.startPvP(n, tr); break; }
-      case 'locate': case 'localizar': { const tp = { vila: 'village', village: 'village', masmorra: 'dungeon', dungeon: 'dungeon', navio: 'ship', ship: 'ship', mansao: 'mansion', 'mansão': 'mansion', mansion: 'mansion', mina: 'mineshaft', mineshaft: 'mineshaft', fortaleza: 'fortress', fortress: 'fortress', bastiao: 'bastion', 'bastião': 'bastion', bastion: 'bastion' }[(a[1] || '').toLowerCase()]; if (!tp) return err('Uso: /locate <vila|masmorra|navio|mansao|mina|fortaleza|bastiao>'); if (NSTRUCT[tp]) { if (this.dim !== 'nether') return err(S.lang === 'en' ? 'Only works in the Abyss.' : 'Só funciona no Abismo.'); let best = null, bd = 1e18; for (const q of this.world.netherStructsNear(p.pos.x, p.pos.z, 1400, tp)) { const dd = (q.x - p.pos.x) ** 2 + (q.z - p.pos.z) ** 2; if (dd < bd) { bd = dd; best = q; } } if (!best) return err('Nada encontrado por perto.'); ok(`${NSTRUCT[tp].name} mais próxima: X ${best.x}, Y ${best.y}, Z ${best.z} — a ${Math.round(Math.sqrt(bd))} blocos`); break; } if (this.dim !== 'overworld') return err('Só funciona na Superfície.'); const s = this.world.locate(tp, p.pos.x, p.pos.z); if (s && tp === 'mineshaft') { ok(`Mina Abandonada mais próxima: X ${s.x}, Y ${s.y}, Z ${s.z} — a ${Math.round(Math.hypot(s.x - p.pos.x, s.z - p.pos.z))} blocos`); break; } if (!s) return err('Nada encontrado por perto.'); ok(`${STRUCT[tp].name} mais próxima: X ${s.x}, Z ${s.z}` + (tp === 'dungeon' ? ` (sala na altura ${s.y}, entrada pelo poço de pedra na superfície)` : '') + ` — a ${Math.round(Math.hypot(s.x - p.pos.x, s.z - p.pos.z))} blocos`); break; }
+      case 'locate': case 'localizar': { const tp = { vila: 'village', village: 'village', masmorra: 'dungeon', dungeon: 'dungeon', navio: 'ship', ship: 'ship', shipwreck: 'ship', mansao: 'mansion', 'mansão': 'mansion', mansion: 'mansion', mina: 'mineshaft', mineshaft: 'mineshaft', fortaleza: 'fortress', fortress: 'fortress', bastiao: 'bastion', 'bastião': 'bastion', bastion: 'bastion' }[(a[1] || '').toLowerCase()]; if (!tp) return err((S.lang === 'en' ? 'Usage: ' : 'Uso: ') + '/locate <village|dungeon|shipwreck|mansion|mineshaft|fortress|bastion>'); if (NSTRUCT[tp]) { if (this.dim !== 'nether') return err(S.lang === 'en' ? 'Only works in the Abyss.' : 'Só funciona no Abismo.'); let best = null, bd = 1e18; for (const q of this.world.netherStructsNear(p.pos.x, p.pos.z, 1400, tp)) { const dd = (q.x - p.pos.x) ** 2 + (q.z - p.pos.z) ** 2; if (dd < bd) { bd = dd; best = q; } } if (!best) return err('Nada encontrado por perto.'); ok(`${NSTRUCT[tp].name} mais próxima: X ${best.x}, Y ${best.y}, Z ${best.z} — a ${Math.round(Math.sqrt(bd))} blocos`); break; } if (this.dim !== 'overworld') return err('Só funciona na Superfície.'); const s = this.world.locate(tp, p.pos.x, p.pos.z); if (s && tp === 'mineshaft') { ok(`Mina Abandonada mais próxima: X ${s.x}, Y ${s.y}, Z ${s.z} — a ${Math.round(Math.hypot(s.x - p.pos.x, s.z - p.pos.z))} blocos`); break; } if (!s) return err('Nada encontrado por perto.'); ok(`${STRUCT[tp].name} mais próxima: X ${s.x}, Z ${s.z}` + (tp === 'dungeon' ? ` (sala na altura ${s.y}, entrada pelo poço de pedra na superfície)` : '') + ` — a ${Math.round(Math.hypot(s.x - p.pos.x, s.z - p.pos.z))} blocos`); break; }
       case 'fly': if (p.mode !== 'survival') { p.flying = !p.flying; ok('Voo: ' + (p.flying ? 'ligado' : 'desligado')); } else err('Só no criativo'); break;
       default: err('Comando desconhecido. Digite /help');
     }
@@ -8504,40 +8504,40 @@ body.touch #actbtn.show{display:block}`;
     ['gamemode', '<survival|creative|spectator>', 'Muda o modo de jogo', 'Change game mode', [['survival', 'creative', 'spectator']]],
     ['time', 'set <day|noon|night|midnight|n>', 'Muda a hora do dia', 'Change the time of day', [['set'], ['day', 'noon', 'night', 'midnight', 'sunrise', 'sunset']]],
     ['weather', '<clear|rain|thunder>', 'Muda o clima', 'Change the weather', [['clear', 'rain', 'thunder']]],
-    ['give', '<item> [quantidade]', 'Dá um item para você', 'Give yourself an item', [ITEMS, ['1', '16', '32', '64']]],
-    ['summon', '<criatura> [x y z]', 'Invoca uma criatura', 'Summon a mob', [MOBS]],
+    ['give', '<item> [amount]', 'Dá um item para você', 'Give yourself an item', [ITEMS, ['1', '16', '32', '64']]],
+    ['summon', '<mob> [x y z]', 'Invoca uma criatura', 'Summon a mob', [MOBS]],
     ['tp', '<x> <y> <z>', 'Teleporta (~ = a partir de onde você está)', 'Teleport (~ = relative)', [['~'], ['~'], ['~']]],
     ['kill', '[@e]', 'Você morre (com @e remove as criaturas)', 'Kill yourself (@e removes mobs)', [['@e']]],
     ['heal', '', 'Recupera toda a vida', 'Restore health', []],
     ['feed', '', 'Mata a fome', 'Restore hunger', []],
     ['clear', '', 'Limpa o inventário', 'Clear inventory', []],
-    ['xp', '<quantidade> [levels]', 'Ganha experiência', 'Add experience', [['10', '100', '1000'], ['levels']]],
+    ['xp', '<n> [levels]', 'Ganha experiência', 'Add experience', [['10', '100', '1000'], ['levels']]],
     ['difficulty', '<peaceful|easy|normal|hard>', 'Muda a dificuldade', 'Change difficulty', [['peaceful', 'easy', 'normal', 'hard']]],
     ['spawnpoint', '', 'Renasce onde você está', 'Set respawn here', []],
     ['fly', '', 'Liga ou desliga o voo', 'Toggle flying', []],
-    ['locate', '<vila|masmorra|navio|mansao|mina|fortaleza|bastiao>', 'Mostra a estrutura mais perto', 'Find the nearest structure', [['vila', 'masmorra', 'navio', 'mansao', 'mina', 'fortaleza', 'bastiao']]],
+    ['locate', '<village|dungeon|shipwreck|mansion|mineshaft|fortress|bastion>', 'Mostra a estrutura mais perto', 'Find the nearest structure', [['village', 'dungeon', 'shipwreck', 'mansion', 'mineshaft', 'fortress', 'bastion']]],
     ['dimension', '<overworld|nether|end>', 'Vai para outra dimensão', 'Go to another dimension', [['overworld', 'nether', 'end']]],
-    ['attribute', '@s <atributo> base set <valor>', 'Muda um atributo (tamanho, velocidade...)', 'Change an attribute (scale, speed...)', [['@s'], () => Object.keys(typeof ATTR_DEF !== 'undefined' ? ATTR_DEF : {}), ['base'], ['set', 'get', 'reset']]],
-    ['raio', '', 'Solta um raio na sua frente', 'Strike lightning ahead', []],
-    ['pvp', '<1-8> [0-3] | kit | stop', 'Luta contra bots', 'Fight bots', [['1', '2', '3', 'kit', 'stop']]],
+    ['attribute', '@s <attribute> base set <value>', 'Muda um atributo (tamanho, velocidade...)', 'Change an attribute (scale, speed...)', [['@s'], () => Object.keys(typeof ATTR_DEF !== 'undefined' ? ATTR_DEF : {}), ['base'], ['set', 'get', 'reset']]],
+    ['lightning', '', 'Solta um raio na sua frente', 'Strike lightning ahead', []],
+    ['pvp', '[1-8] [0-3] | kit | stop', 'Luta contra bots', 'Fight bots', [['1', '2', '3', 'kit', 'stop']]],
     ['seed', '', 'Mostra a semente do mundo', 'Show world seed', []],
     ['items', '', 'Lista todos os itens', 'List all items', []],
     ['mobs', '', 'Lista todas as criaturas', 'List all mobs', []],
     ['players', '', 'Quem está jogando (multijogador)', 'Who is online (multiplayer)', []],
-    ['comandos', '<on|off>', 'Libera ou bloqueia comandos dos convidados (dono)', 'Allow or block guest commands (host)', [['on', 'off']]],
-    ['kick', '<jogador>', 'Expulsa um jogador (dono)', 'Kick a player (host)', []],
-    ['mute', '<jogador> [minutos]', 'Deixa um jogador mudo (dono)', 'Mute a player (host)', []],
+    ['guestcommands', '<on|off>', 'Libera ou bloqueia comandos dos convidados (dono)', 'Allow or block guest commands (host)', [['on', 'off']]],
+    ['kick', '<player>', 'Expulsa um jogador (dono)', 'Kick a player (host)', []],
+    ['mute', '<player> [minutes]', 'Deixa um jogador mudo (dono)', 'Mute a player (host)', []],
     ['help', '', 'Ajuda', 'Help', []]
   ];
   // comandos prontos (botão da lista)
   const READY = () => [
     [L('Hora', 'Time'), ['/time set day', '/time set noon', '/time set night', '/time set midnight']],
-    [L('Clima', 'Weather'), ['/weather clear', '/weather rain', '/weather thunder', '/raio']],
+    [L('Clima', 'Weather'), ['/weather clear', '/weather rain', '/weather thunder', '/lightning']],
     [L('Modo de jogo', 'Game mode'), ['/gamemode survival', '/gamemode creative', '/gamemode spectator', '/fly']],
     [L('Jogador', 'Player'), ['/heal', '/feed', '/clear', '/xp 30 levels', '/spawnpoint', '/kill']],
     [L('Itens', 'Items'), ['/give diamond 64', '/give iron_ingot 64', '/give torch 64', '/give bread 32']],
     [L('Criaturas', 'Mobs'), ['/summon pig', '/summon cow', '/summon zombie', '/kill @e']],
-    [L('Mundo', 'World'), ['/difficulty peaceful', '/difficulty normal', '/locate vila', '/seed']]
+    [L('Mundo', 'World'), ['/difficulty peaceful', '/difficulty normal', '/locate village', '/seed']]
   ];
   // ---------- tela ----------
   const st = document.createElement('style'); st.textContent = `
@@ -8582,7 +8582,8 @@ body.chopen #touchui,body.chopen #chatlog,body.chopen #itemname,body.chopen #hot
   // nada de botões de toque roubando o foco do campo
   for (const b of [bList, bSlash, bSend, top.querySelector('#chBack')]) b.addEventListener('pointerdown', e => e.preventDefault());
   // ---------- histórico ----------
-  function drawHist() { hist.innerHTML = (UI.chatLines || []).map(l => '<div>' + l.h + '</div>').join(''); hist.scrollTop = hist.scrollHeight; }
+  const trH = h => (typeof I18N !== 'undefined' && I18N.tr) ? I18N.tr(h) : h;
+  function drawHist() { hist.innerHTML = (UI.chatLines || []).map(l => '<div>' + trH(l.h) + '</div>').join(''); hist.scrollTop = hist.scrollHeight; }
   const ch0 = UI.chat.bind(UI); UI.chat = function () { const r = ch0.apply(this, arguments); if (UI.chatOpen) drawHist(); return r; };
   // ---------- sugestões ----------
   let listMode = false, sel = -1, items = [];
@@ -9166,9 +9167,9 @@ html,body,*{overscroll-behavior:none}
   const cs = G.chatSubmit; G.chatSubmit = function (v) {
     const NX = window.NETX; v = String(v || '');
     if (NX && NX.isClient() && v[0] === '/') { const c = (v.slice(1).split(/\s+/)[0] || '').toLowerCase();
-      if (!this.cheats) { UI.chat(L('O dono do mundo não liberou comandos para convidados.', 'The host has not allowed commands for guests.'), '#f66'); return; }
+      if (!this.cheats) { UI.chat(L('O dono do mundo não liberou comandos para convidados (/guestcommands on).', 'The host has not allowed commands for guests (/guestcommands on).'), '#f66'); return; }
       if (WORLD.has(c) || (c === 'kill' && /@e/.test(v))) { const o = { t: 'cmd', v }; if (c === 'raio' || c === 'lightning') { const d = this.lookDir(); o.p = [this.player.pos.x + d.x * 8, this.player.pos.z + d.z * 8]; } NX.sendHost(o); return; } }
-    if (window.NET && NET.role === 'host') { const m = /^\/(comandos|commands)\s+(\S+)/i.exec(v); if (m) { const on = /^(on|sim|liga|ligar|yes|1)$/i.test(m[2]); NET.guestCmds = on; const msg = L('Comandos para convidados: ', 'Guest commands: ') + (on ? L('liberados', 'allowed') : L('bloqueados', 'blocked')); UI.chat(msg, '#ff5'); if (window.NETX) NETX.toAll({ t: 'chat', m: msg, c: '#ff5' }); return; } }
+    if (window.NET && NET.role === 'host') { const m = /^\/(guestcommands|comandos|commands)\s+(\S+)/i.exec(v); if (m) { const on = /^(on|sim|liga|ligar|yes|1)$/i.test(m[2]); NET.guestCmds = on; const msg = L('Comandos para convidados: ', 'Guest commands: ') + (on ? L('liberados', 'allowed') : L('bloqueados', 'blocked')); UI.chat(msg, '#ff5'); if (window.NETX) NETX.toAll({ t: 'chat', m: msg, c: '#ff5' }); return; } }
     return cs.apply(this, arguments);
   };
 })();
