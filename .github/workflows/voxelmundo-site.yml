@@ -1,0 +1,30 @@
+name: VoxelMundo Site (Firebase)
+
+# Publica o site voxelmundo-sw.web.app sozinho a cada versão nova (mesmos arquivos do APK).
+# Precisa do segredo FIREBASE_SERVICE_ACCOUNT no repositório (Settings > Secrets > Actions).
+on:
+  push:
+    branches: [voxelmundo]
+    paths:
+      - 'VoxelMundo/app/src/main/assets/**'
+      - 'VoxelMundo/firebase.json'
+      - '.github/workflows/voxelmundo-site.yml'
+  workflow_dispatch:
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Conferir a chave
+        env:
+          KEY: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
+        run: |
+          if [ -z "$KEY" ]; then echo "::error::Falta o segredo FIREBASE_SERVICE_ACCOUNT (Settings > Secrets > Actions)"; exit 1; fi
+      - uses: FirebaseExtended/action-hosting-deploy@v0
+        with:
+          repoToken: ${{ secrets.GITHUB_TOKEN }}
+          firebaseServiceAccount: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
+          projectId: voxelmundo-sw
+          channelId: live
+          entryPoint: VoxelMundo

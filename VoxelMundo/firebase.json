@@ -1,0 +1,10 @@
+{
+  "hosting": {
+    "public": "app/src/main/assets",
+    "ignore": ["firebase.json", "**/.*"],
+    "headers": [
+      { "source": "**/*.@(js|png|jpg|mp3|json)", "headers": [{ "key": "Cache-Control", "value": "public, max-age=3600" }] },
+      { "source": "index.html", "headers": [{ "key": "Cache-Control", "value": "no-cache" }] }
+    ]
+  }
+}
