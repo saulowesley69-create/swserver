@@ -4640,7 +4640,7 @@ const G = {
   },
   newWorld(o) {
     const id = 'w' + Date.now().toString(36); let seed = o.seed.trim(); let s = seed === '' ? (Math.random() * 2e9) | 0 : (/^-?\d+$/.test(seed) ? parseInt(seed) | 0 : hashStr(seed) | 0);
-    const meta = { id, name: o.name || 'Novo Mundo', seed: s, mode: o.mode, last: Date.now(), difficulty: o.difficulty, cheats: o.cheats, keepInv: o.keepInv || o.type === 'arena' || o.type === 'kitpvp', gen: 6, type: o.type || 'normal' };
+    const meta = { id, name: o.name || 'New World', seed: s, mode: o.mode, last: Date.now(), difficulty: o.difficulty, cheats: o.cheats, keepInv: o.keepInv || o.type === 'arena' || o.type === 'kitpvp', gen: 6, type: o.type || 'normal' };
     const ws = this.listWorlds(); ws.push(meta); this.setWorlds(ws); this.startGame(meta, null);
   },
   readWorldData(meta) { try { return JSON.parse(localStorage.getItem('vm_w_' + meta.id)); } catch (e) { return null; } },
@@ -5572,7 +5572,7 @@ const I18N = (function () {
   on('#optDone', () => { UI.show(UI.optBack); });
   on('#ctrlBack', () => UI.show(UI.ctrlBack));
   on('#wPlay', () => { if (UI.selWorld) G.loadWorld(UI.selWorld); else UI.toast('Selecione um mundo'); });
-  on('#wNew', () => { $('#cName').value = 'Novo Mundo'; $('#cSeed').value = ''; UI.show('s-create'); });
+  on('#wNew', () => { $('#cName').value = 'New World'; $('#cSeed').value = ''; UI.show('s-create'); });
   let delAll = false;
   on('#wDel', () => { if (!UI.selWorld) return; delAll = false; $('#delMsg').textContent = S.lang === 'en' ? 'Delete this world forever?' : 'Excluir este mundo para sempre?'; $('#delconfirm').classList.remove('hidden'); });
   on('#wDelAll', () => { const n = G.listWorlds().length; if (!n) return; delAll = true; $('#delMsg').textContent = S.lang === 'en' ? (n === 1 ? 'Delete your world forever?' : 'Delete ALL ' + n + ' worlds forever?') : (n === 1 ? 'Excluir o seu mundo para sempre?' : 'Excluir TODOS os ' + n + ' mundos para sempre?'); $('#delconfirm').classList.remove('hidden'); });
@@ -5585,7 +5585,7 @@ const I18N = (function () {
   const gCheat = cyc('#cCheat', [true, false], ['Sim', 'Não'], 0);
   const gKeep = cyc('#cKeep', [false, true], ['Não', 'Sim'], 0);
   $('#cMode').addEventListener('click', () => { const m = gMode(); $('#modeDesc').textContent = { survival: 'Procure recursos, crie ferramentas, ganhe níveis, vida e fome.', creative: 'Recursos ilimitados, voo livre e quebra instantânea.', hardcore: 'Igual à sobrevivência, mas no difícil e com apenas uma vida!', spectator: 'Voe através de tudo e apenas observe.' }[m]; });
-  on('#cGo', () => G.newWorld({ name: $('#cName').value.trim() || 'Novo Mundo', seed: $('#cSeed').value, mode: gMode(), difficulty: gDiff(), cheats: gCheat(), keepInv: gKeep() }));
+  on('#cGo', () => G.newWorld({ name: $('#cName').value.trim() || 'New World', seed: $('#cSeed').value, mode: gMode(), difficulty: gDiff(), cheats: gCheat(), keepInv: gKeep() }));
   on('#cBack', () => UI.show('s-worlds'));
   on('#pResume', () => G.resume());
   on('#pOptions', () => { UI.optBack = 's-pause'; UI.show('s-options'); });
@@ -7037,7 +7037,7 @@ MOB_CLASS.villager = function (x, y, z) { return new Villager(x, y, z, Math.floo
     const sh = UI.show; UI.show = function (id) { if (id === 's-create') { ti = 0; lab(); } return sh.apply(this, arguments); };
     goBtn.addEventListener('click', () => { goBtn.dataset.type = TYPES[ti][0]; }, true);
     // passa o tipo para newWorld
-    const nw = G.newWorld; G.newWorld = function (o) { const t = goBtn.dataset.type; if (t && !o.type) { o.type = t; } goBtn.dataset.type = ''; if (o.type && o.type !== 'normal' && (!o.name || o.name === 'Novo Mundo')) o.name = TYPES.find(x => x[0] === o.type)[1]; return nw.call(this, o); };
+    const nw = G.newWorld; G.newWorld = function (o) { const t = goBtn.dataset.type; if (t && !o.type) { o.type = t; } goBtn.dataset.type = ''; if (o.type && o.type !== 'normal' && (!o.name || o.name === 'Novo Mundo' || /^New World( \(\d+\))?$/.test(o.name))) o.name = TYPES.find(x => x[0] === o.type)[1]; return nw.call(this, o); };
   }
   window.MODE_STATE = { A, K };
   function WB() { const d = G.dimData && G.dimData.overworld; if (!d) return {}; d.bdata = d.bdata || {}; return d.bdata.best || (d.bdata.best = {}); }
@@ -8917,13 +8917,13 @@ body.chopen #touchui,body.chopen #chatlog,body.chopen #itemname,body.chopen #hot
     for (const x of [del, all, play]) if (x) x.style.display = 'none';
     if (nw && bk && bk.parentNode !== nw.parentNode) { nw.parentNode.appendChild(bk); }
  }
-  function importPick() { const inp = document.createElement('input'); inp.type = 'file'; inp.accept = '.zip,application/zip'; inp.onchange = async () => { const f = inp.files[0]; if (!f) return; try { const m = await WS.importZip(f); UI.selWorld = m.id; UI.renderWorlds(); UI.toast(L('Mundo importado: ', 'World imported: ') + m.name); } catch (e) { console.error(e); UI.toast(L('Esse arquivo não é um mundo do VoxelMundo', 'This file is not a VoxelMundo world')); } }; inp.click(); }
+  function importPick() { const inp = document.createElement('input'); inp.type = 'file'; inp.accept = '.zip,application/zip'; inp.onchange = async () => { const f = inp.files[0]; if (!f) return; try { const m = await WS.importZip(f); if (window.uniqueWorldName) { const u = uniqueWorldName(m.name, m.id); if (u !== m.name) { m.name = u; await saveMeta(m); } } UI.selWorld = m.id; UI.renderWorlds(); UI.toast(L('Mundo importado: ', 'World imported: ') + m.name); } catch (e) { console.error(e); UI.toast(L('Esse arquivo não é um mundo do VoxelMundo', 'This file is not a VoxelMundo world')); } }; inp.click(); }
   async function saveMeta(m) { if (FS) { const mj = await FS.read(base(m) + 'mundo.json'); try { const w = JSON.parse(mj); w.meta = metaOnly(m); await FS.write(base(m) + 'mundo.json', JSON.stringify(w, null, 1)); } catch (e) { } }
     else { try { const L2 = JSON.parse(localStorage.getItem('vm_worlds') || '[]'), o = L2.find(x => x.id === m.id); if (o) { Object.assign(o, metaOnly(m)); localStorage.setItem('vm_worlds', JSON.stringify(L2)); } } catch (e) { } } }
   async function exportOne(m) { await WS.flush(); const r = await WS.exportZip(m.id); if (!r) return UI.toast(L('Não deu para exportar', 'Could not export'));
     if (window.VMFS && VMFS.saveDownload) { const fr = new FileReader(); fr.onload = () => { const ok = VMFS.saveDownload(r.name, String(fr.result).split(',')[1]); UI.toast(ok ? L('Salvo em Downloads/VoxelMundo: ', 'Saved to Downloads/VoxelMundo: ') + r.name : L('Não deu para salvar', 'Could not save')); }; fr.readAsDataURL(r.blob); return; }
     const a = document.createElement('a'); a.href = URL.createObjectURL(r.blob); a.download = r.name; document.body.appendChild(a); a.click(); setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 2000); }
-  async function duplicate(m) { await WS.flush(); const r = await WS.exportZip(m.id); if (!r) return; const n = await WS.importZip(new File([r.blob], r.name)); n.name = m.name + L(' (cópia)', ' (copy)'); await saveMeta(n); UI.selWorld = n.id; UI.renderWorlds(); UI.toast(L('Cópia criada', 'Copy created')); return n; }
+  async function duplicate(m) { await WS.flush(); const r = await WS.exportZip(m.id); if (!r) return; const n = await WS.importZip(new File([r.blob], r.name)); n.name = window.uniqueWorldName ? uniqueWorldName(m.name, n.id) : m.name + ' (1)'; await saveMeta(n); UI.selWorld = n.id; UI.renderWorlds(); UI.toast(L('Cópia criada', 'Copy created')); return n; }
   // imagem escolhida do aparelho -> 320x180, fica fixa (não é trocada pela foto automática)
   function pickImage(m, done) { const inp = document.createElement('input'); inp.type = 'file'; inp.accept = 'image/*'; inp.onchange = () => { const f = inp.files[0]; if (!f) return; const img = new Image(); img.onload = async () => { const c = document.createElement('canvas'); c.width = 320; c.height = 180; const k = Math.max(320 / img.width, 180 / img.height), w = img.width * k, h = img.height * k; c.getContext('2d').drawImage(img, (320 - w) / 2, (180 - h) / 2, w, h); const b64 = c.toDataURL('image/png').split(',')[1]; URL.revokeObjectURL(img.src);
       m.icon = 'data:image/png;base64,' + b64; m.iconLock = true; if (FS) await FS.writeB64(base(m) + 'icone.png', b64); await saveMeta(m); UI.renderWorlds(); done && done(); UI.toast(L('Imagem trocada', 'Image changed')); }; img.src = URL.createObjectURL(f); }; inp.click(); }
@@ -8935,7 +8935,7 @@ body.chopen #touchui,body.chopen #chatlog,body.chopen #itemname,body.chopen #hot
     const h = document.createElement('h2'); h.style.margin = '0'; h.textContent = L('Editar mundo', 'Edit world');
     const big = document.createElement('div'); big.className = 'wbig'; if (m.icon) big.style.backgroundImage = 'url(' + m.icon + ')'; if (wide) big.style.width = 'min(260px,36vw)';
     const nr = document.createElement('div'); nr.style.cssText = 'display:flex;gap:6px;width:' + (wide ? 'min(300px,40vw)' : 'min(420px,86vw)'); const inp = document.createElement('input'); inp.value = m.name; inp.maxLength = 30; const ok = document.createElement('button'); ok.className = 'btn'; ok.textContent = L('Salvar', 'Save'); ok.style.width = 'auto'; ok.style.padding = '0 14px';
-    ok.onclick = async () => { Snd.play('click'); const n = inp.value.trim(); if (!n || n === m.name) return; m.name = n; await saveMeta(m); UI.renderWorlds(); UI.toast(L('Nome trocado', 'Renamed')); };
+    ok.onclick = async () => { Snd.play('click'); let n = inp.value.trim(); if (!n || n === m.name) return; n = window.uniqueWorldName ? uniqueWorldName(n, m.id) : n; inp.value = n; m.name = n; await saveMeta(m); UI.renderWorlds(); UI.toast(L('Nome trocado', 'Renamed')); };
     inp.addEventListener('keydown', e => { if (e.key === 'Enter') ok.click(); }); nr.append(inp, ok);
     const info = document.createElement('div'); info.style.cssText = 'color:#bbb;font-size:15px;text-align:center'; info.textContent = (m.folder ? L('Pasta: ', 'Folder: ') + m.folder + ' · ' : '') + L('Semente: ', 'Seed: ') + m.seed;
     left.append(h, big, nr, info);
@@ -9172,4 +9172,16 @@ html,body,*{overscroll-behavior:none}
     if (window.NET && NET.role === 'host') { const m = /^\/(guestcommands|comandos|commands)\s+(\S+)/i.exec(v); if (m) { const on = /^(on|sim|liga|ligar|yes|1)$/i.test(m[2]); NET.guestCmds = on; const msg = L('Comandos para convidados: ', 'Guest commands: ') + (on ? L('liberados', 'allowed') : L('bloqueados', 'blocked')); UI.chat(msg, '#ff5'); if (window.NETX) NETX.toAll({ t: 'chat', m: msg, c: '#ff5' }); return; } }
     return cs.apply(this, arguments);
   };
+})();
+
+// ================= NOMES DE MUNDO ÚNICOS: "New World", "New World (1)", "New World (2)"... =================
+(function () {
+  window.uniqueWorldName = function (name, exceptId) {
+    name = String(name || '').trim() || 'New World'; if (name === 'Novo Mundo') name = 'New World';
+    const used = new Set(G.listWorlds().filter(w => w.id !== exceptId).map(w => String(w.name).trim().toLowerCase()));
+    if (!used.has(name.toLowerCase())) return name;
+    const base = name.replace(/\s*\(\d+\)$/, ''); for (let n = 1; n < 9999; n++) { const c = base + ' (' + n + ')'; if (!used.has(c.toLowerCase())) return c; }
+    return name; };
+  const nw = G.newWorld; G.newWorld = function (o) { o = o || {}; o.name = uniqueWorldName(o.name); return nw.call(this, o); };
+  const b = document.getElementById('wNew'); if (b) b.addEventListener('click', () => { const i = document.getElementById('cName'); if (i) i.value = uniqueWorldName('New World'); });
 })();
