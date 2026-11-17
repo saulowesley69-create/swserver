@@ -1,5 +1,6 @@
 {
   "hosting": {
+    "site": "voxelmundo-sw",
     "public": "app/src/main/assets",
     "ignore": ["firebase.json", "**/.*"],
     "headers": [
