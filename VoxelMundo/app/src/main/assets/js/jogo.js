@@ -9735,3 +9735,137 @@ html,body,*{overscroll-behavior:none}
   const nw = G.newWorld; G.newWorld = function (o) { o = o || {}; o.name = uniqueWorldName(o.name); return nw.call(this, o); };
   const b = document.getElementById('wNew'); if (b) b.addEventListener('click', () => { const i = document.getElementById('cName'); if (i) i.value = uniqueWorldName('New World'); });
 })();
+
+// ================= MODELOS DE MOBS EM ARQUIVOS (como o Minecraft): poucas partes + pele em PNG =================
+// Antes: cada mob era dezenas de caixinhas coloridas (olho, boca, cinto... tudo caixa), cada uma com seu material.
+// Agora: modelos/<mob>.json (ossos que se mexem + cubos) e texturas/entidades/<mob>.png (a pele pintada).
+// Detalhes finos encostados numa parte (olhos, boca, manchas, cintos) viram pixels pintados na pele.
+// Na versão de arquivo único (testes) o mesmo conversor roda na hora e dá o mesmo resultado.
+(function () {
+  const TPU = 4;            // texels por unidade (1 unidade = 1/16 de bloco) -> 64 px por bloco (o granulado fica em 32 px por bloco)
+  const FLAT = 0.6;         // o que sai menos que isto para fora de uma parte vira pintura
+  const SKIP = new Set(['fighter']); // muda de cor a cada vez: continua do jeito antigo
+  const LEGACY = Object.assign({}, MOB_BUILD);
+  window.MOB_LEGACY = LEGACY;
+  const hash = (a, b, c) => { let h = (Math.imul(a, 374761393) + Math.imul(b, 668265263) + Math.imul(c, 2147483647)) | 0; h = Math.imul(h ^ (h >>> 13), 1274126177); return ((h ^ (h >>> 16)) >>> 0) / 4294967296; };
+  // ---------- faces do cubo: [nome, eixo da normal, sinal, eixo u, sinal u, eixo v, sinal v] (v para baixo na imagem) ----------
+  const FACES = [['px', 0, 1, 2, -1, 1, -1], ['nx', 0, -1, 2, 1, 1, -1], ['py', 1, 1, 0, 1, 2, 1], ['ny', 1, -1, 0, 1, 2, -1], ['pz', 2, 1, 0, 1, 1, -1], ['nz', 2, -1, 0, -1, 1, -1]];
+  // região de cada face dentro do retângulo do cubo (layout parecido com o do Minecraft)
+  const faceRect = (W, H, D, f) => ({ py: [D, 0, W, D], ny: [D + W, 0, W, D], px: [0, D, D, H], nz: [D, D, W, H], nx: [D + W, D, D, H], pz: [2 * D + W, D, W, H] })[f];
+  // ======================= CONVERSOR: modelo antigo -> {json, canvas} =======================
+  function bake(type) {
+    // monta com as peças antigas (inclusive quando um mob usa o modelo de outro, como a vaca-cogumelo)
+    const now = {}; for (const k in LEGACY) { now[k] = MOB_BUILD[k]; MOB_BUILD[k] = LEGACY[k]; }
+    const m = { root: new THREE.Group(), mats: [], legs: [] }; try { LEGACY[type](m); } finally { for (const k in now) MOB_BUILD[k] = now[k]; } m.root.updateMatrixWorld(true);
+    m.root.traverse(o => { if (o.isLine || o.isPoints || o.isSprite || (o.material && o.material.wireframe)) throw new Error('peça que não é cubo'); });
+    const bones = new Map(), list = [];
+    const addBone = o => { if (bones.has(o)) return bones.get(o); const i = list.length; bones.set(o, i); list.push(o); return i; };
+    addBone(m.root);
+    const walk = v => { if (v && v.isObject3D) return { b: addBone(v) }; if (v && v.isMaterial) return { mat: v.uuid }; if (Array.isArray(v)) return v.map(walk);
+      if (v && typeof v === 'object' && !v.isColor && !v.isVector3) { const o = {}; for (const k in v) o[k] = walk(v[k]); return { o }; } return { v: v === undefined ? null : v }; };
+    const refs = {}; for (const k in m) { if (k === 'root' || k === 'mats') continue; refs[k] = walk(m[k]); }
+    // pais de ossos também viram ossos (para as animações continuarem iguais)
+    for (let i = 0; i < list.length; i++) { let p = list[i].parent; while (p && p !== m.root && !bones.has(p)) { addBone(p); p = p.parent; } }
+    const ud = []; for (let i = 0; i < list.length; i++) { const u = list[i].userData, o = {}; let any = false; for (const k in u) { o[k] = walk(u[k]); any = true; } ud[i] = any ? o : null; }
+    const inv = list.map(b => new THREE.Matrix4().copy(b.matrixWorld).invert());
+    // cubos
+    const cubes = [], kinds = [], kindKey = new Map(), matCube = new Map();
+    const kindOf = mt => { const basic = !!mt.isMeshBasicMaterial, em = !basic && mt.emissive ? mt.emissive.getHex() : 0;
+      const k = { basic, em, op: mt.transparent ? +mt.opacity.toFixed(3) : 1, dw: mt.depthWrite !== false, side: mt.side || 0, noMap: !mt.map, wf: mt.userData && mt.userData.wf || 0 };
+      const s = JSON.stringify(k); if (!kindKey.has(s)) { kindKey.set(s, kinds.length); kinds.push(k); } return kindKey.get(s); };
+    m.root.traverse(o => { if (!o.isMesh) return;
+      let b = o, hidden = false; if (!bones.has(o)) { b = o.parent; let q = o; while (!bones.has(q)) { if (!q.visible) hidden = true; q = q.parent; } b = q; }
+      if (hidden) return;
+      const bi = bones.get(b); o.geometry.computeBoundingBox(); const bb = o.geometry.boundingBox, cen = bb.getCenter(new THREE.Vector3()), sz = bb.getSize(new THREE.Vector3());
+      const M = new THREE.Matrix4().multiplyMatrices(inv[bi], o.matrixWorld); const pos = new THREE.Vector3(), q = new THREE.Quaternion(), sc = new THREE.Vector3(); M.decompose(pos, q, sc);
+      const c = cen.clone().applyMatrix4(M); const size = [Math.abs(sz.x * sc.x) * 16, Math.abs(sz.y * sc.y) * 16, Math.abs(sz.z * sc.z) * 16];
+      const mt = o.material, col = mt.color ? [mt.color.r, mt.color.g, mt.color.b] : [1, 1, 1];
+      const cube = { b: bi, c: [c.x * 16, c.y * 16, c.z * 16], s: size, q: [q.x, q.y, q.z, q.w], col, k: kindOf(mt), paint: [], mat: mt.uuid, id: cubes.length };
+      cubes.push(cube); matCube.set(mt.uuid, cube); });
+    // pintura: cubo fino/encostado dentro de outro (mesmo osso, mesmo tipo, sem giro) vira pixels na pele do outro
+    const ident = q => Math.abs(q[3]) > 0.9999;
+    const keep = [];
+    for (const d of cubes) { let host = null;
+      if (ident(d.q) && !kinds[d.k].em && kinds[d.k].op === 1 && !kinds[d.k].basic) for (const p of keep) { if (p.b !== d.b || p.k !== d.k || !ident(p.q)) continue;
+        let ok = true, touches = false; for (let a = 0; a < 3; a++) { const pm = p.c[a] - p.s[a] / 2, pM = p.c[a] + p.s[a] / 2, dm = d.c[a] - d.s[a] / 2, dM = d.c[a] + d.s[a] / 2; if (dm < pm - FLAT - 1e-3 || dM > pM + FLAT + 1e-3) { ok = false; break; } if (dm <= pm + 0.02 || dM >= pM - 0.02) touches = true; }
+        if (ok && touches) { host = p; } }
+      if (host) { host.paint.push(d); d.into = host; } else keep.push(d); }
+    // espaço na pele para cada cubo (com 1 px de borda)
+    const rects = keep.map(cb => { const W = Math.max(1, Math.ceil(cb.s[0] * TPU - 0.01)), H = Math.max(1, Math.ceil(cb.s[1] * TPU - 0.01)), D = Math.max(1, Math.ceil(cb.s[2] * TPU - 0.01)); return { cb, W, H, D, w: 2 * (D + W) + 2, h: D + H + 2 }; });
+    let TW = 64; const area = rects.reduce((a, r) => a + r.w * r.h, 0); while (TW * TW < area * 1.6 || rects.some(r => r.w > TW)) TW *= 2;
+    const order = rects.slice().sort((a, b) => b.h - a.h); let x = 0, y = 0, rowH = 0;
+    for (const r of order) { if (x + r.w > TW) { x = 0; y += rowH; rowH = 0; } r.x = x + 1; r.y = y + 1; x += r.w; rowH = Math.max(rowH, r.h); }
+    let TH = 16; while (TH < y + rowH) TH *= 2;
+    // pinta
+    const cv = document.createElement('canvas'); cv.width = TW; cv.height = TH; const g = cv.getContext('2d'), img = g.createImageData(TW, TH), px = img.data;
+    const put = (u, v, c, f) => { if (u < 0 || v < 0 || u >= TW || v >= TH) return; const i = (v * TW + u) * 4; px[i] = Math.min(255, c[0] * f * 255); px[i + 1] = Math.min(255, c[1] * f * 255); px[i + 2] = Math.min(255, c[2] * f * 255); px[i + 3] = 255; };
+    for (const r of rects) { const cb = r.cb, noMap = kinds[cb.k].noMap;
+      for (const F of FACES) { const [name, na, ns, ua, us, va, vs] = F, [fx, fy, fw, fh] = faceRect(r.W, r.H, r.D, name), ox = r.x + fx, oy = r.y + fy;
+        // cor de cada texel: a própria parte e, por cima, o que foi pintado nela (na ordem em que foi montado)
+        const half = cb.s.map(v => v / 2), uLen = cb.s[ua], vLen = cb.s[va];
+        for (let j = -1; j <= fh; j++) for (let i = -1; i <= fw; i++) { const ii = Math.min(fw - 1, Math.max(0, i)), jj = Math.min(fh - 1, Math.max(0, j));
+          // ponto no meio do texel, em coordenadas do osso
+          const fu = (ii + 0.5) / fw, fv = (jj + 0.5) / fh, P = [0, 0, 0]; P[na] = cb.c[na] + ns * half[na]; P[ua] = cb.c[ua] + us * (fu - 0.5) * uLen; P[va] = cb.c[va] + vs * (fv - 0.5) * vLen;
+          let c = cb.col, src = cb; for (const d of cb.paint) { let inside = true; for (let a = 0; a < 3; a++) { if (a === na) { // precisa chegar até a superfície
+                if (ns > 0 ? d.c[a] + d.s[a] / 2 < P[a] - 0.02 : d.c[a] - d.s[a] / 2 > P[a] + 0.02) { inside = false; break; } continue; }
+              if (P[a] < d.c[a] - d.s[a] / 2 - 1e-4 || P[a] > d.c[a] + d.s[a] / 2 + 1e-4) { inside = false; break; } }
+            if (inside) { c = d.col; src = d; } }
+          const B2 = TPU >> 1, edge = (ii < B2 || jj < B2 || ii >= fw - B2 || jj >= fh - B2) && fw > 2 * TPU && fh > 2 * TPU ? 0.055 : 0;
+          const f = noMap && src === cb ? 1 : 1 - edge - hash((ox + ii) >> 1, (oy + jj) >> 1, src.id * 31 + 7) * 0.13;
+          put(ox + i, oy + j, c, f); } } }
+    g.putImageData(img, 0, 0);
+    const json = { format: 'voxelmundo.model/1', mob: type, texture: 'texturas/entidades/' + type + '.png', tw: TW, th: TH, tpu: TPU,
+      bones: list.map((b, i) => ({ parent: i === 0 ? -1 : bones.get(b.parent), mesh: !!b.isMesh && i !== 0, p: [b.position.x, b.position.y, b.position.z], r: [b.rotation.x, b.rotation.y, b.rotation.z, b.rotation.order], s: [b.scale.x, b.scale.y, b.scale.z], vis: b.visible, ud: ud[i] })),
+      kinds, cubes: rects.map(r => ({ b: r.cb.b, k: r.cb.k, c: r.cb.c.map(v => +v.toFixed(4)), s: r.cb.s.map(v => +v.toFixed(4)), q: ident(r.cb.q) ? undefined : r.cb.q.map(v => +v.toFixed(6)), uv: [r.x, r.y, r.W, r.H, r.D], m: r.cb.mat })),
+      mats: Object.fromEntries(cubes.map(cb => [cb.mat, (cb.into || cb).mat])), refs };
+    // tira os ids internos de material: troca por índice do cubo dono
+    const mi = new Map(); json.cubes.forEach((c, i) => { mi.set(c.m, i); }); for (const k in json.mats) json.mats[k] = mi.get(json.mats[k]); json.cubes.forEach(c => delete c.m);
+    const fixRef = v => { if (Array.isArray(v)) return v.map(fixRef); if (v && v.mat !== undefined) return { cube: json.mats[v.mat] }; if (v && v.o) { const o = {}; for (const k in v.o) o[k] = fixRef(v.o[k]); return { o }; } return v; };
+    for (const k in json.refs) json.refs[k] = fixRef(json.refs[k]); json.bones.forEach(b => { if (b.ud) for (const k in b.ud) b.ud[k] = fixRef(b.ud[k]); }); delete json.mats;
+    return { json, canvas: cv };
+  }
+  window.bakeMobModel = bake;
+  // ======================= MONTAGEM a partir do arquivo =======================
+  const CACHE = {};
+  function prepare(type, json, image) {
+    const tex = new THREE.Texture(image); tex.magFilter = THREE.NearestFilter; tex.minFilter = THREE.NearestFilter; tex.generateMipmaps = false; tex.needsUpdate = true;
+    const TW = json.tw, TH = json.th, groups = new Map(); // "osso|tipo" -> arrays
+    json.cubes.forEach((cb, ci) => { const key = cb.b + '|' + cb.k; let G_ = groups.get(key); if (!G_) groups.set(key, G_ = { b: cb.b, k: cb.k, pos: [], nor: [], uv: [], idx: [], cubes: [] }); G_.cubes.push(ci);
+      const q = cb.q ? new THREE.Quaternion(cb.q[0], cb.q[1], cb.q[2], cb.q[3]) : null, [ux, uy, W, H, D] = cb.uv, half = cb.s.map(v => v / 2 / 16), c = cb.c.map(v => v / 16);
+      for (const F of FACES) { const [name, na, ns, ua, us, va, vs] = F, [fx, fy, fw, fh] = faceRect(W, H, D, name), base = G_.pos.length / 3;
+        const n = new THREE.Vector3(); n.setComponent(na, ns); if (q) n.applyQuaternion(q);
+        for (const [a, bq] of [[0, 0], [1, 0], [1, 1], [0, 1]]) { const P = new THREE.Vector3(); P.setComponent(na, ns * half[na]); P.setComponent(ua, us * (a - 0.5) * 2 * half[ua]); P.setComponent(va, vs * (bq - 0.5) * 2 * half[va]); if (q) P.applyQuaternion(q);
+          G_.pos.push(P.x + c[0], P.y + c[1], P.z + c[2]); G_.nor.push(n.x, n.y, n.z); G_.uv.push((ux + fx + a * fw) / TW, 1 - (uy + fy + bq * fh) / TH); }
+        // ordem dos triângulos: a face tem que olhar para fora
+        const e1 = [0, 0, 0], e2 = [0, 0, 0]; e1[ua] = us; e2[va] = vs; const cr = [e1[1] * e2[2] - e1[2] * e2[1], e1[2] * e2[0] - e1[0] * e2[2], e1[0] * e2[1] - e1[1] * e2[0]], out = cr[na] * ns > 0;
+        if (out) G_.idx.push(base, base + 1, base + 2, base, base + 2, base + 3); else G_.idx.push(base, base + 2, base + 1, base, base + 3, base + 2); } });
+    for (const G_ of groups.values()) { const geo = new THREE.BufferGeometry(); geo.setAttribute('position', new THREE.Float32BufferAttribute(G_.pos, 3)); geo.setAttribute('normal', new THREE.Float32BufferAttribute(G_.nor, 3)); geo.setAttribute('uv', new THREE.Float32BufferAttribute(G_.uv, 2)); geo.setIndex(G_.idx); geo.computeBoundingSphere(); G_.geo = geo; G_.pos = G_.nor = G_.uv = G_.idx = null; }
+    const cubeGroup = []; for (const G_ of groups.values()) for (const ci of G_.cubes) cubeGroup[ci] = G_;
+    return (CACHE[type] = { json, tex, groups: [...groups.values()], cubeGroup });
+  }
+  function build(type, m) {
+    const P = CACHE[type], J = P.json, objs = [];
+    J.bones.forEach((b, i) => { const o = i === 0 ? m.root : (b.mesh ? new THREE.Mesh(new THREE.BufferGeometry()) : new THREE.Group()); if (i > 0) { o.position.set(b.p[0], b.p[1], b.p[2]); o.rotation.set(b.r[0], b.r[1], b.r[2], b.r[3] || 'XYZ'); o.scale.set(b.s[0], b.s[1], b.s[2]); o.visible = b.vis; } else { o.position.set(b.p[0], b.p[1], b.p[2]); o.rotation.set(b.r[0], b.r[1], b.r[2], b.r[3] || 'XYZ'); o.scale.set(b.s[0], b.s[1], b.s[2]); } objs[i] = o; });
+    J.bones.forEach((b, i) => { if (i > 0) objs[b.parent].add(objs[i]); });
+    const meshOf = new Map();
+    for (const G_ of P.groups) { const k = J.kinds[G_.k], mt = k.basic ? new THREE.MeshBasicMaterial({ map: P.tex }) : new THREE.MeshLambertMaterial({ map: P.tex });
+      if (k.em) mt.emissive = new THREE.Color(k.em); if (k.op < 1) { mt.transparent = true; mt.opacity = k.op; } if (!k.dw) mt.depthWrite = false; if (k.side) mt.side = k.side; if (k.wf) mt.userData.wf = k.wf;
+      m.mats.push(mt); const bo = objs[G_.b];
+      if (bo.isMesh && !bo.userData._used) { bo.geometry = G_.geo; bo.material = mt; bo.userData._used = true; meshOf.set(G_, bo); }
+      else { const me = new THREE.Mesh(G_.geo, mt); bo.add(me); meshOf.set(G_, me); } }
+    const res = v => { if (Array.isArray(v)) return v.map(res); if (!v) return v; if (v.b !== undefined) return objs[v.b]; if (v.cube !== undefined) { const G_ = P.cubeGroup[v.cube]; return G_ ? meshOf.get(G_).material : null; } if (v.o) { const o = {}; for (const k in v.o) o[k] = res(v.o[k]); return o; } return v.v; };
+    for (const k in J.refs) { if (k === 'legs') { m.legs = res(J.refs.legs) || []; continue; } m[k] = res(J.refs[k]); }
+    J.bones.forEach((b, i) => { if (b.ud) for (const k in b.ud) objs[i].userData[k] = res(b.ud[k]); delete objs[i].userData._used; });
+    if (m.woolMats) m.woolMats = [...new Set(m.woolMats.filter(Boolean))];
+  }
+  window.MOB_MODELS = CACHE;
+  // troca os construtores: se o modelo do arquivo está pronto, usa ele
+  for (const t in LEGACY) { if (SKIP.has(t)) continue;
+    MOB_BUILD[t] = function (m) { if (!CACHE[t] && !window.VM_ASSETS) { try { const r = bake(t); prepare(t, r.json, r.canvas); } catch (e) { SKIP.add(t); } }
+      if (CACHE[t]) return build(t, m); return LEGACY[t](m); }; }
+  // versão em pastas: carrega os arquivos de verdade
+  if (window.VM_ASSETS) {
+    fetch('modelos/lista.json').then(r => r.json()).then(L => Promise.all(L.map(t => fetch('modelos/' + t + '.json').then(r => r.json()).then(J => new Promise(ok => { const im = new Image(); im.onload = () => { prepare(t, J, im); ok(); }; im.onerror = () => ok(); im.src = J.texture; })).catch(() => { }))))
+      .then(() => { window._modelsFromFile = true; }).catch(() => { });
+  }
+})();
