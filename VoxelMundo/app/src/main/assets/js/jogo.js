@@ -1931,6 +1931,16 @@ window.STATE_ITEM = window.STATE_ITEM || {};
   const bb = blockBoxes; blockBoxes = function (id, X, Y, Z, phys, world) { if (BL[id].boxes === 'bell') return [[4 / 16, 3 / 16, 4 / 16, 12 / 16, 5 / 16, 12 / 16], [5 / 16, 5 / 16, 5 / 16, 11 / 16, 12 / 16, 11 / 16], [6 / 16, 12 / 16, 6 / 16, 10 / 16, 13 / 16, 10 / 16], [7.5 / 16, 13 / 16, 7.5 / 16, 8.5 / 16, 1, 8.5 / 16]]; return bb.apply(this, arguments); };
 })();
 
+// ================= CAMINHO DE TERRA (pá na grama/terra) — 15/16 de altura, como no jogo original =================
+(function () {
+  retile('path_top', (px, r) => { for (let y = 0; y < 16; y++) for (let x = 0; x < 16; x++) { const v = r(); let c = [150, 122, 72]; if (v < 0.18) c = [170, 142, 88]; else if (v < 0.32) c = [132, 104, 60]; else if (v > 0.93) c = [112, 86, 50]; px(x, y, c); } });
+  retile('path_side', (px, r) => { for (let y = 0; y < 16; y++) for (let x = 0; x < 16; x++) { const v = r(); let c; if (y === 0) c = [0, 0, 0, 0]; else if (y <= 2) c = v < 0.3 ? [168, 140, 86] : [146, 118, 70]; else { c = v < 0.2 ? [134, 96, 67] : v < 0.4 ? [100, 70, 46] : v > 0.92 ? [150, 150, 150] : [121, 85, 58]; } px(x, y, c); } });
+  defBlock(146, 'dirt_path', 'Caminho de Terra', { opaque: false, shape: 'box', boxes: 'path', hard: 0.65, tool: 'shovel', drop: 2, t: { top: 'path_top', side: 'path_side', bottom: 'dirt' }, snd: 'dirt' });
+  OPAQ[146] = 0; if (typeof EN !== 'undefined') EN.dirt_path = 'Dirt Path';
+  defItem(146, 'dirt_path', 'Caminho de Terra', { block: 146, cat: 'blocks' });
+  const bb = blockBoxes; blockBoxes = function (id, X, Y, Z, phys, world) { if (BL[id].boxes === 'path') return [[0, 0, 0, 1, 15 / 16, 1]]; return bb.apply(this, arguments); };
+})();
+
 // ================= MUNDO =================
 const CS = 16, WH = 160, NH = 96, SEA = 40;
 const ckey = (cx, cz) => cx + ',' + cz;
@@ -2539,11 +2549,11 @@ function makeLoot(kind, r, meta) {
 function buildVillage(w, s, put) {
   const r = mulberry32(s.seed), B_ = (k, d) => BID[k] !== undefined ? BID[k] : d;
   // estilo de cada bioma (como as vilas do jogo original): planície = carvalho, deserto = arenito, savana = acácia, neve = pinheiro, bétula = bétula
-  const ST = s.desert ? { WALL: BID.sandstone, POST: B_('terracotta_yellow', BID.sandstone), ROOF: BID.sandstone, TRIM: B_('sandstone_slab', BID.sandstone), PATH: BID.sandstone }
-    : s.sav ? { WALL: B_('acacia_planks', BID.planks), POST: B_('acacia_log', BID.log), ROOF: B_('terracotta_orange', BID.planks), TRIM: B_('acacia_planks_slab', BID.planks), PATH: BID.gravel }
-    : s.snow ? { WALL: B_('spruce_planks', BID.planks), POST: BID.spruce_log, ROOF: B_('spruce_planks', BID.planks), TRIM: B_('spruce_planks_slab', BID.planks), PATH: BID.gravel, SNOWR: true }
-    : s.birch ? { WALL: B_('birch_planks', BID.planks), POST: B_('birch_log', BID.log), ROOF: B_('spruce_planks', BID.planks), TRIM: B_('spruce_planks_slab', BID.planks), PATH: BID.gravel }
-    : { WALL: BID.planks, POST: BID.log, ROOF: B_('spruce_planks', BID.spruce_log), TRIM: B_('spruce_planks_slab', BID.planks), PATH: BID.gravel };
+  const ST = s.desert ? { WALL: BID.sandstone, POST: B_('terracotta_yellow', BID.sandstone), ROOF: BID.sandstone, TRIM: B_('sandstone_slab', BID.sandstone), PATH: B_('dirt_path', BID.sandstone) }
+    : s.sav ? { WALL: B_('acacia_planks', BID.planks), POST: B_('acacia_log', BID.log), ROOF: B_('terracotta_orange', BID.planks), TRIM: B_('acacia_planks_slab', BID.planks), PATH: B_('dirt_path', BID.gravel) }
+    : s.snow ? { WALL: B_('spruce_planks', BID.planks), POST: BID.spruce_log, ROOF: B_('spruce_planks', BID.planks), TRIM: B_('spruce_planks_slab', BID.planks), PATH: B_('dirt_path', BID.gravel), SNOWR: true }
+    : s.birch ? { WALL: B_('birch_planks', BID.planks), POST: B_('birch_log', BID.log), ROOF: B_('spruce_planks', BID.planks), TRIM: B_('spruce_planks_slab', BID.planks), PATH: B_('dirt_path', BID.gravel) }
+    : { WALL: BID.planks, POST: BID.log, ROOF: B_('spruce_planks', BID.spruce_log), TRIM: B_('spruce_planks_slab', BID.planks), PATH: B_('dirt_path', BID.gravel) };
   const WALL = ST.WALL, POST = ST.POST, ROOF = ST.ROOF, PATH = ST.PATH, FOUND = BID.cobble, TRIM = ST.TRIM;
   const gy = s.y;
   // poço central
@@ -2552,7 +2562,7 @@ function buildVillage(w, s, put) {
   for (let i = 0; i < n; i++) {
     const ang = i / n * Math.PI * 2 + r() * 0.4, dist = 14 + r() * 9, hx = Math.round(s.x + Math.cos(ang) * dist), hz = Math.round(s.z + Math.sin(ang) * dist), kind = kinds[i] || 'house', hy = w.heightAt(hx, hz), sub = mulberry32((s.seed + i * 977) >>> 0);
     // caminho
-    const steps = Math.ceil(dist); for (let t = 3; t <= steps; t++) { const px = Math.round(s.x + (hx - s.x) * t / steps), pz = Math.round(s.z + (hz - s.z) * t / steps); for (const [ox, oz] of [[0, 0], [1, 0], [0, 1]]) { const y = w.heightAt(px + ox, pz + oz); if (y > SEA) { put(px + ox, y, pz + oz, PATH); put(px + ox, y + 1, pz + oz, 0); put(px + ox, y + 2, pz + oz, 0); } } }
+    const steps = Math.ceil(dist); for (let t = 3; t <= steps; t++) { const px = Math.round(s.x + (hx - s.x) * t / steps), pz = Math.round(s.z + (hz - s.z) * t / steps); for (const [ox, oz] of [[0, 0], [1, 0], [0, 1]]) { const y = w.heightAt(px + ox, pz + oz); if (y > SEA) { put(px + ox, y, pz + oz, s.desert && hash3(px + ox, y, pz + oz, s.seed) < 0.25 ? BID.sandstone : PATH); put(px + ox, y + 1, pz + oz, 0); put(px + ox, y + 2, pz + oz, 0); } } }
     if (hy <= SEA) continue;
     if (kind === 'farm') {
       for (let x = -4; x <= 4; x++) for (let z = -3; z <= 3; z++) { const X = hx + x, Z = hz + z, edge = Math.abs(x) === 4 || Math.abs(z) === 3; for (let y = hy - 3; y < hy; y++) put(X, y, Z, BID.dirt); for (let y = hy + 1; y <= hy + 5; y++) put(X, y, Z, 0); put(X, hy, Z, edge ? POST : z === 0 ? BID.water : BID.farmland); if (!edge && z !== 0) { const crop = [['wheat_0', 'wheat_1', 'wheat_2', 'wheat_3'], ['carrots_0', 'carrots_1', 'carrots_2'], ['potatoes_0', 'potatoes_1', 'potatoes_2']][(i + (z > 0 ? 1 : 0)) % 3], k = crop[sub() * crop.length | 0]; if (BID[k] !== undefined) put(X, hy + 1, Z, BID[k]); } }
@@ -8894,6 +8904,18 @@ body.chopen #touchui,body.chopen #chatlog,body.chopen #itemname,body.chopen #hot
     const rev = this.sfxRev; this.master = lp; if (rev && pend.q) this.sfxRev = lp; // atrás da parede: sem eco "aberto"
     try { return pl(name, vol); } finally { this.master = real; this.sfxRev = rev; } };
   const mt = Snd.mat && Snd.mat.bind(Snd); if (mt) Snd.mat = function () { if (!pend || performance.now() - pendT > 4 || !this.ctx || !this.master) return mt.apply(this, arguments); const real = this.master, lp = this.ctx.createBiquadFilter(); lp.type = 'lowpass'; lp.frequency.value = pend.f; lp.connect(real); this.master = lp; try { return mt.apply(this, arguments); } finally { this.master = real; } };
+})();
+
+// ===== pá na grama/terra vira caminho; bloco sólido em cima volta a ser terra =====
+(function () {
+  const OK = () => new Set(['grass', 'dirt', 'snow_grass', 'podzol', 'mycelium', 'coarse_dirt'].map(k => BID[k]).filter(v => v !== undefined));
+  let ok = null;
+  const us = G.use; G.use = function () { const p = this.player, s = p && p.held, t = this.target, w = this.world; ok = ok || OK();
+    if (s && t && !this.entTarget && IT[s.id].tool === 'shovel' && ok.has(t.id) && t.n[1] !== -1 && !p.sneaking) { const up = w.getBlock(t.x, t.y + 1, t.z);
+      if (!up || (!SOLID[up] && BL[up].cross)) { if (up) w.setBlock(t.x, t.y + 1, t.z, 0); w.setBlock(t.x, t.y, t.z, BID.dirt_path); Snd.mat('dirt', 0.8, 'place'); if (p.mode !== 'creative') p.damageTool(1); this.swing = 1; return; } }
+    return us.apply(this, arguments); };
+  const bc = G.blockChanged; G.blockChanged = function (x, y, z, o, n) { const r = bc.apply(this, arguments); const w = this.world;
+    if (w && n && SOLID[n] && OPAQ[n] && w.getBlock(x, y - 1, z) === BID.dirt_path) w.setBlock(x, y - 1, z, BID.dirt); return r; };
 })();
 
 // ================= REDSTONE: simulação (10 vezes por segundo), desenho e uso =================
