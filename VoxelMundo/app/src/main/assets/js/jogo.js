@@ -7052,11 +7052,11 @@ MOB_CLASS.villager = function (x, y, z) { return new Villager(x, y, z, Math.floo
   // ---------- ONE BLOCK ----------
   const PH = [
     { n: 0, pt: 'Planície', en: 'Plains', b: [['grass', 30], ['dirt', 18], ['log', 20], ['leaves', 10], ['sand', 6], ['clay', 4], ['pumpkin', 3], ['melon', 3], ['gravel', 4]], m: ['pig', 'cow', 'sheep', 'chicken'] },
-    { n: 50, pt: 'Subsolo', en: 'Underground', b: [['stone', 34], ['cobble', 10], ['coal_ore', 16], ['iron_ore', 12], ['copper_ore', 8], ['gravel', 6], ['dirt', 5], ['mossy_cobble', 5], ['log', 6]], m: ['zombie', 'skeleton', 'spider'] },
-    { n: 150, pt: 'Profundezas', en: 'Deep Caves', b: [['stone', 26], ['iron_ore', 14], ['gold_ore', 10], ['redstone_ore', 10], ['lapis_ore', 8], ['diamond_ore', 4], ['emerald_ore', 2], ['obsidian', 3], ['coal_ore', 10], ['log', 5]], m: ['zombie', 'skeleton', 'spider', 'boomer', 'slime'] },
-    { n: 260, pt: 'Terras Geladas', en: 'Frozen Lands', b: [['snow', 18], ['ice', 12], ['packed_ice', 10], ['spruce_log', 18], ['spruce_leaves', 8], ['stone', 12], ['iron_ore', 8], ['diamond_ore', 3]], m: ['wolf', 'rabbit', 'zombie', 'skeleton'] },
-    { n: 360, pt: 'O Abismo', en: 'The Abyss', b: [['netherrack', 28], ['soul_sand', 10], ['nether_bricks', 8], ['glowstone', 6], ['magma', 6], ['nether_quartz_ore', 10], ['blackstone', 8], ['gilded_blackstone', 4], ['crimson_stem', 8], ['ancient_debris', 1]], m: ['javardo', 'fire_spirit', 'dark_skeleton'] },
-    { n: 480, pt: 'O Vazio', en: 'The Void', b: [['end_stone', 36], ['end_bricks', 10], ['obsidian', 10], ['diamond_ore', 6], ['emerald_ore', 6], ['gold_block', 2]], m: ['wanderer'] }
+    { n: 200, pt: 'Subsolo', en: 'Underground', b: [['stone', 34], ['cobble', 10], ['coal_ore', 16], ['iron_ore', 12], ['copper_ore', 8], ['gravel', 6], ['dirt', 5], ['mossy_cobble', 5], ['log', 6]], m: ['zombie', 'skeleton', 'spider'] },
+    { n: 500, pt: 'Profundezas', en: 'Deep Caves', b: [['stone', 26], ['iron_ore', 14], ['gold_ore', 10], ['redstone_ore', 10], ['lapis_ore', 8], ['diamond_ore', 4], ['emerald_ore', 2], ['obsidian', 3], ['coal_ore', 10], ['log', 5]], m: ['zombie', 'skeleton', 'spider', 'boomer', 'slime'] },
+    { n: 900, pt: 'Terras Geladas', en: 'Frozen Lands', b: [['snow', 18], ['ice', 12], ['packed_ice', 10], ['spruce_log', 18], ['spruce_leaves', 8], ['stone', 12], ['iron_ore', 8], ['diamond_ore', 3]], m: ['wolf', 'rabbit', 'zombie', 'skeleton'] },
+    { n: 1400, pt: 'O Abismo', en: 'The Abyss', b: [['netherrack', 28], ['soul_sand', 10], ['nether_bricks', 8], ['glowstone', 6], ['magma', 6], ['nether_quartz_ore', 10], ['blackstone', 8], ['gilded_blackstone', 4], ['crimson_stem', 8], ['ancient_debris', 1]], m: ['javardo', 'fire_spirit', 'dark_skeleton'] },
+    { n: 2000, pt: 'O Vazio', en: 'The Void', b: [['end_stone', 36], ['end_bricks', 10], ['obsidian', 10], ['diamond_ore', 6], ['emerald_ore', 6], ['gold_block', 2]], m: ['wanderer'] }
   ];
   const phaseOf = n => { let p = PH[0]; for (const q of PH) if (n >= q.n) p = q; return p; };
   const pickW = list => { const L = list.filter(([k]) => BID[k] !== undefined); let tot = L.reduce((a, b) => a + b[1], 0), r = Math.random() * tot; for (const [k, w] of L) { r -= w; if (r <= 0) return BID[k]; } return BID.dirt; };
@@ -7066,7 +7066,7 @@ MOB_CLASS.villager = function (x, y, z) { return new Villager(x, y, z, Math.floo
     if (over) { if (p.pos.y < Y - 0.6) return; p.pos.y = Y + 1; if (p.vel.y < 0) p.vel.y = 0; p.fallDist = 0; }
     const st = w.bdata.oneblock || (w.bdata.oneblock = { n: 0 }); st.n++; const ph = phaseOf(st.n), prev = phaseOf(st.n - 1);
     if (ph !== prev && window.SCORE) SCORE.phaseUp(ph, PH.indexOf(ph));
-    if (st.n % 25 === 0 || Math.random() < 0.03) { w.setBlock(0, Y, 0, BID.chest, { noUpdate: true }); const kind = 'ob' + PH.indexOf(ph) + (Math.random() < 0.08 ? 'r' : ''); w.bdata['0,' + Y + ',0'] = { f: 4, t: 'chest', items: makeLoot(kind, mulberry32((st.n * 7919 + w.seed) >>> 0)) }; }
+    if (st.n % 50 === 0 || Math.random() < 0.025) { w.setBlock(0, Y, 0, BID.chest, { noUpdate: true }); const kind = 'ob' + PH.indexOf(ph) + (Math.random() < 0.08 ? 'r' : ''); w.bdata['0,' + Y + ',0'] = { f: 4, t: 'chest', items: makeLoot(kind, mulberry32((st.n * 7919 + w.seed) >>> 0)) }; }
     else w.setBlock(0, Y, 0, pickW(ph.b), { noUpdate: true });
     Particles.spawn(0.5, Y + 0.6, 0.5, [0.7, 1, 0.7], 10, 1.5, 0.7, -1, 0.5);
     if (Math.random() < 0.05 && st.n > 5) { const t = ph.m[Math.random() * ph.m.length | 0]; if (MOB_TYPES[t]) setTimeout(() => { if (G.world === w) G.entities.push(makeMob(t, 0.5, Y + 1.05, 0.5)); }, 300); }
