@@ -7065,8 +7065,8 @@ MOB_CLASS.villager = function (x, y, z) { return new Villager(x, y, z, Math.floo
     const over = Math.abs(p.pos.x - 0.5) < 0.8 && Math.abs(p.pos.z - 0.5) < 0.8 && p.pos.y > Y - 1.8 && p.pos.y < Y + 1;
     if (over) { if (p.pos.y < Y - 0.6) return; p.pos.y = Y + 1; if (p.vel.y < 0) p.vel.y = 0; p.fallDist = 0; }
     const st = w.bdata.oneblock || (w.bdata.oneblock = { n: 0 }); st.n++; const ph = phaseOf(st.n), prev = phaseOf(st.n - 1);
-    if (ph !== prev) { UI.toast((en() ? 'New phase: ' : 'Nova fase: ') + (en() ? ph.en : ph.pt) + '!'); Snd.play('levelup', 0.7); }
-    if (st.n % 25 === 0 || Math.random() < 0.035) { w.setBlock(0, Y, 0, BID.chest, { noUpdate: true }); const kind = ph.n >= 480 ? 'bastion' : ph.n >= 360 ? 'fortress' : 'mineshaft'; w.bdata['0,' + Y + ',0'] = { f: 4, t: 'chest', items: makeLoot(kind, mulberry32((st.n * 7919 + w.seed) >>> 0)) }; }
+    if (ph !== prev && window.SCORE) SCORE.phaseUp(ph, PH.indexOf(ph));
+    if (st.n % 25 === 0 || Math.random() < 0.03) { w.setBlock(0, Y, 0, BID.chest, { noUpdate: true }); const kind = 'ob' + PH.indexOf(ph) + (Math.random() < 0.08 ? 'r' : ''); w.bdata['0,' + Y + ',0'] = { f: 4, t: 'chest', items: makeLoot(kind, mulberry32((st.n * 7919 + w.seed) >>> 0)) }; }
     else w.setBlock(0, Y, 0, pickW(ph.b), { noUpdate: true });
     Particles.spawn(0.5, Y + 0.6, 0.5, [0.7, 1, 0.7], 10, 1.5, 0.7, -1, 0.5);
     if (Math.random() < 0.05 && st.n > 5) { const t = ph.m[Math.random() * ph.m.length | 0]; if (MOB_TYPES[t]) setTimeout(() => { if (G.world === w) G.entities.push(makeMob(t, 0.5, Y + 1.05, 0.5)); }, 300); }
@@ -7123,14 +7123,12 @@ MOB_CLASS.villager = function (x, y, z) { return new Villager(x, y, z, Math.floo
     K.bots = K.bots.filter(b => !b.dead && !b.dying);
     const want = Math.min(4, 1 + Math.floor(K.streak / 4)), tier = Math.min(3, Math.floor(K.streak / 3));
     if (K.bots.length < want && Math.random() < 0.02) { const a = Math.random() * 6.28, x = Math.cos(a) * 15, z = Math.sin(a) * 15; const f = new Fighter(x, Y + 1.05, z, tier, NAMES[Math.random() * NAMES.length | 0]); f.mansion = 'kit'; G.entities.push(f); K.bots.push(f); Particles.spawn(x, Y + 2, z, [0.8, 0.5, 1], 20, 3, 0.8, -1, 0.5); }
-    UI.bossBar((en() ? 'KitPvP · Kills: ' : 'KitPvP · Abates: ') + K.kills + (en() ? ' · Streak: ' : ' · Sequência: ') + K.streak + (en() ? ' · Best: ' : ' · Recorde: ') + (WB().kitBest || 0), Math.min(1, K.streak / Math.max(1, WB().kitBest || 5)));
     if (p.pos.y < Y - 30) p.damage(999, 'void'); };
   // convidado no mundo de KitPvP de outro jogador: escolha de kit, placar e queda no vazio (os bots vêm do anfitrião)
   window.kitClientTick = () => { const p = G.player; if (!p || T() !== 'kitpvp') return;
     if (p.dead) { if (K.streak) UI.toast((en() ? 'Streak ended: ' : 'Sequência encerrada: ') + K.streak + (en() ? ' · Best: ' : ' · Recorde: ') + (K.best || 0)); K.streak = 0; K.need = true; return; }
     if (K.need && p.mode === 'survival' && G.state === 'play') { K.need = false; showKits(); }
     K.best = Math.max(K.best || 0, K.streak);
-    UI.bossBar((en() ? 'KitPvP · Kills: ' : 'KitPvP · Abates: ') + K.kills + (en() ? ' · Streak: ' : ' · Sequência: ') + K.streak + (en() ? ' · Best: ' : ' · Recorde: ') + (K.best || 0), Math.min(1, K.streak / Math.max(1, K.best || 5)));
     if (p.pos.y < Y - 30) p.damage(999, 'void'); };
   const pz = G.pause; G.pause = function () { if (ks.style.display === 'flex') return; return pz.apply(this, arguments); };
   // ---------- laço ----------
@@ -7163,7 +7161,7 @@ MOB_CLASS.villager = function (x, y, z) { return new Villager(x, y, z, Math.floo
     // passa o tipo para newWorld
     const nw = G.newWorld; G.newWorld = function (o) { const t = goBtn.dataset.type; if (t && !o.type) { o.type = t; } goBtn.dataset.type = ''; if (o.type && o.type !== 'normal' && (!o.name || o.name === 'Novo Mundo' || /^New World( \(\d+\))?$/.test(o.name))) o.name = TYPES.find(x => x[0] === o.type)[1]; return nw.call(this, o); };
   }
-  window.MODE_STATE = { A, K };
+  window.MODE_STATE = { A, K, PH, phaseOf, best: () => WB() };
   function WB() { const d = G.dimData && G.dimData.overworld; if (!d) return {}; d.bdata = d.bdata || {}; return d.bdata.best || (d.bdata.best = {}); }
 })();
 
@@ -7461,7 +7459,7 @@ MOB_CLASS.villager = function (x, y, z) { return new Villager(x, y, z, Math.floo
   // ---------- canal de mensagens (com mensagens grandes em pedaços) ----------
   function send(peer, o) { if (!peer || !peer.open) return; try { const s = JSON.stringify(o); if (s.length < 60000) peer.dc.send(s); else { const id = Math.random().toString(36).slice(2), n = Math.ceil(s.length / 60000); for (let i = 0; i < n; i++) peer.dc.send(JSON.stringify({ t: '~', id, i, n, s: s.slice(i * 60000, (i + 1) * 60000) })); } } catch (e) { } }
   const toAll = (o, except) => { for (const p of NET.peers) if (p !== except) send(p, o); };
-  const envMsg = () => ({ t: 'env', time: G.time, day: G.day, r: !!G.raining, th: !!G.thundering, cm: !!NET.guestCmds && !!G.cheats, diff: G.difficulty, pvp: pvpOn() });
+  const envMsg = () => ({ t: 'env', time: G.time, day: G.day, r: !!G.raining, th: !!G.thundering, cm: !!NET.guestCmds && !!G.cheats, diff: G.difficulty, pvp: pvpOn(), ob: G.world && G.world.bdata && G.world.bdata.oneblock ? G.world.bdata.oneblock.n : undefined, aw: window.MODE_STATE ? MODE_STATE.A.wave : 0, ab: window.MODE_STATE ? (MODE_STATE.best().arenaBest || 0) : 0 });
   function wire(peer) {
     const dc = peer.dc; dc.binaryType = 'arraybuffer'; peer.parts = {};
     dc.onopen = () => { peer.open = true; onOpen(peer); };
@@ -7694,7 +7692,7 @@ MOB_CLASS.villager = function (x, y, z) { return new Villager(x, y, z, Math.floo
       case 'e': applyEnts(o); break;
       case 'pl': applyPlayers(o.l); break;
       case 'left': dropAvatar(o.id); break;
-      case 'env': { G.time = o.time; G.day = o.day; G.raining = o.r; G.thundering = !!o.th; G.cheats = !!o.cm; G.weatherT = 1e9; if (o.diff !== undefined) G.difficulty = o.diff; NET.pvp = o.pvp !== false; break; }
+      case 'env': { G.time = o.time; G.day = o.day; G.raining = o.r; G.thundering = !!o.th; G.cheats = !!o.cm; G.weatherT = 1e9; if (o.diff !== undefined) G.difficulty = o.diff; NET.pvp = o.pvp !== false; NET.envOb = o.ob; NET.envAw = o.aw; NET.envAb = o.ab; break; }
       case 'hurt': { if (o.s === 'pvp') { pvpHurtMe(o.d, o.by, o.k); break; } const p = G.player; if (!p || p.dead) break; const kb = o.k ? new THREE.Vector3(o.k[0], o.k[1], o.k[2]) : null; p.damage(o.d, o.s, kb); break; }
       case 'xp': if (G.player) G.player.addXP(o.n); break;
       case 'give': { const p = G.player; if (!p) break; const left = p.give(o.s); Snd.play('pop', 0.5); UI.dirtyHotbar = true; if (left > 0) sendHost({ t: 'drop', d: G.dim, p: [p.pos.x, p.pos.y + 0.5, p.pos.z], s: Object.assign({}, o.s, { c: left }) }); break; }
@@ -8808,6 +8806,54 @@ body.chopen #touchui,body.chopen #chatlog,body.chopen #itemname,body.chopen #hot
   const uf = UI.updateFurnaceUI; UI.updateFurnaceUI = function () { const r = uf.apply(this, arguments); const c = this.container, fl = document.querySelector('.flame'); if (fl && c) fl.classList.toggle('on', c.burn > 0); return r; };
 })();
 
+// ================= BAÚS REBALANCEADOS (inspirado nas tabelas do Minecraft) + baús do One Block por fase =================
+// [item, mín, máx, chance]. Diamante e maçã dourada ficam raros no começo e só ficam comuns no fim do jogo.
+(function () {
+  const LT = {
+    // casa de vila: comida e coisas do dia a dia, nada de diamante
+    village: [['bread', 1, 4, 0.7], ['apple', 1, 3, 0.55], ['seeds', 2, 6, 0.5], ['wheat', 1, 4, 0.35], ['carrot', 1, 3, 0.3], ['potato', 1, 3, 0.3], ['stick', 2, 6, 0.4], ['coal', 1, 4, 0.35], ['torch', 2, 6, 0.4], ['planks', 4, 10, 0.4], ['leather', 1, 3, 0.25], ['sapling', 1, 2, 0.3], ['emerald', 1, 1, 0.12], ['iron_ingot', 1, 2, 0.1]],
+    // ferreiro: ferro é comum, diamante é raro (≈ 8%)
+    smith: [['iron_ingot', 1, 5, 0.8], ['coal', 2, 6, 0.6], ['bread', 1, 3, 0.5], ['apple', 1, 3, 0.4], ['gold_ingot', 1, 3, 0.25], ['iron_pickaxe', 1, 1, 0.2], ['iron_sword', 1, 1, 0.2], ['iron_helmet', 1, 1, 0.15], ['iron_chest', 1, 1, 0.08], ['obsidian', 1, 3, 0.25], ['saddle', 1, 1, 0.08], ['diamond', 1, 2, 0.08]],
+    // masmorra: ossos, carne podre, um pouco de ferro; maçã dourada ≈ 15%, diamante quase nunca
+    dungeon: [['bone', 2, 6, 0.6], ['rotten_flesh', 2, 6, 0.55], ['string', 2, 5, 0.5], ['gunpowder', 1, 4, 0.5], ['bread', 1, 3, 0.4], ['wheat', 1, 4, 0.35], ['coal', 1, 4, 0.35], ['iron_ingot', 1, 4, 0.35], ['copper_ingot', 2, 5, 0.35], ['redstone', 2, 6, 0.3], ['arrow', 4, 10, 0.4], ['gold_ingot', 1, 3, 0.2], ['saddle', 1, 1, 0.2], ['wind_charge', 2, 6, 0.3], ['breeze_rod', 1, 1, 0.12], ['emerald', 1, 2, 0.15], ['obsidian', 1, 3, 0.12], ['BOOK', 1, 1, 0.2], ['TBOOK', 1, 1, 0.06], ['golden_apple', 1, 1, 0.15], ['diamond', 1, 1, 0.04], ['enchanted_golden_apple', 1, 1, 0.015]],
+    // naufrágio: papel, comida, minérios; diamante ≈ 8%
+    ship: [['paper', 1, 6, 0.6], ['iron_ingot', 1, 5, 0.6], ['coal', 2, 6, 0.4], ['wheat', 2, 6, 0.4], ['carrot', 1, 3, 0.3], ['potato', 1, 3, 0.3], ['rotten_flesh', 2, 5, 0.5], ['emerald', 1, 4, 0.4], ['gold_ingot', 1, 4, 0.35], ['lapis', 2, 6, 0.3], ['leather_boots', 1, 1, 0.2], ['bucket', 1, 1, 0.15], ['BOOK', 1, 1, 0.12], ['TBOOK', 1, 1, 0.05], ['diamond', 1, 2, 0.08]],
+    // mina abandonada: trilhos, tochas, comida; diamante e maçã dourada ≈ 8%
+    mineshaft: [['rail', 4, 12, 0.6], ['torch', 4, 12, 0.5], ['coal', 3, 8, 0.55], ['bread', 1, 3, 0.5], ['iron_ingot', 1, 4, 0.45], ['gold_ingot', 1, 3, 0.25], ['redstone', 3, 8, 0.3], ['lapis', 3, 8, 0.3], ['seeds', 2, 4, 0.3], ['carrot', 2, 4, 0.25], ['potato', 2, 4, 0.25], ['iron_pickaxe', 1, 1, 0.1], ['saddle', 1, 1, 0.08], ['BOOK', 1, 1, 0.1], ['diamond', 1, 2, 0.08], ['golden_apple', 1, 1, 0.08]],
+    // ===== One Block: um baú por fase (e uma versão rara "r") =====
+    ob0: [['seeds', 2, 6, 0.8], ['bread', 1, 3, 0.6], ['apple', 1, 3, 0.6], ['sapling', 1, 2, 0.6], ['bone_meal', 1, 4, 0.4], ['carrot', 1, 2, 0.35], ['potato', 1, 2, 0.35], ['wheat', 1, 3, 0.3], ['sugarcane', 1, 3, 0.3], ['stick', 2, 6, 0.4], ['torch', 2, 4, 0.3], ['string', 1, 3, 0.3], ['leather', 1, 2, 0.25], ['dirt', 4, 10, 0.4], ['water_bucket', 1, 1, 0.12]],
+    ob0r: [['water_bucket', 1, 1, 1], ['lava_bucket', 1, 1, 0.6], ['sapling', 2, 4, 0.8], ['iron_ingot', 1, 3, 0.5], ['bread', 2, 5, 0.8], ['bone_meal', 3, 8, 0.6]],
+    ob1: [['coal', 2, 8, 0.7], ['torch', 4, 10, 0.6], ['cobble', 8, 16, 0.4], ['bread', 1, 3, 0.5], ['copper_ingot', 1, 4, 0.4], ['iron_ingot', 1, 3, 0.35], ['bone', 1, 4, 0.4], ['string', 1, 3, 0.3], ['arrow', 2, 8, 0.3], ['stone_pickaxe', 1, 1, 0.3], ['stone_sword', 1, 1, 0.25], ['rail', 2, 6, 0.25], ['redstone', 1, 4, 0.2], ['water_bucket', 1, 1, 0.1], ['lava_bucket', 1, 1, 0.08]],
+    ob1r: [['iron_pickaxe', 1, 1, 0.6], ['iron_ingot', 3, 6, 0.9], ['lava_bucket', 1, 1, 0.6], ['water_bucket', 1, 1, 0.5], ['saddle', 1, 1, 0.3], ['BOOK', 1, 1, 0.4]],
+    ob2: [['iron_ingot', 2, 5, 0.6], ['coal', 2, 6, 0.5], ['redstone', 2, 6, 0.45], ['lapis', 2, 6, 0.4], ['gold_ingot', 1, 3, 0.35], ['bread', 1, 4, 0.5], ['iron_pickaxe', 1, 1, 0.2], ['iron_sword', 1, 1, 0.15], ['iron_helmet', 1, 1, 0.12], ['obsidian', 1, 3, 0.15], ['BOOK', 1, 1, 0.12], ['diamond', 1, 1, 0.06], ['golden_apple', 1, 1, 0.04]],
+    ob2r: [['diamond', 1, 2, 0.5], ['golden_apple', 1, 1, 0.35], ['iron_chest', 1, 1, 0.4], ['iron_legs', 1, 1, 0.4], ['BOOK', 1, 1, 0.6], ['gold_ingot', 2, 5, 0.8]],
+    ob3: [['snow', 2, 6, 0.3], ['spruce_sapling', 1, 3, 0.5], ['raw_fish', 1, 4, 0.5], ['leather', 1, 4, 0.4], ['iron_ingot', 1, 4, 0.5], ['arrow', 4, 10, 0.4], ['bow', 1, 1, 0.2], ['leather_chest', 1, 1, 0.25], ['iron_axe', 1, 1, 0.15], ['gold_ingot', 1, 3, 0.25], ['steak', 1, 4, 0.3], ['BOOK', 1, 1, 0.15], ['diamond', 1, 1, 0.08], ['golden_apple', 1, 1, 0.06]],
+    ob3r: [['diamond', 2, 3, 0.6], ['ENCH:iron_chest', 1, 1, 0.4], ['ENCH:bow', 1, 1, 0.4], ['golden_apple', 1, 1, 0.45], ['BOOK', 1, 1, 0.6]],
+    ob4: [['gold_ingot', 2, 6, 0.6], ['gold_nugget', 4, 12, 0.5], ['quartz', 3, 9, 0.5], ['obsidian', 2, 5, 0.4], ['iron_ingot', 1, 4, 0.4], ['flint_steel', 1, 1, 0.3], ['ember', 1, 3, 0.3], ['gold_sword', 1, 1, 0.2], ['saddle', 1, 1, 0.2], ['BOOK', 1, 1, 0.2], ['diamond', 1, 2, 0.12], ['golden_apple', 1, 1, 0.1], ['netherite_scrap', 1, 1, 0.03]],
+    ob4r: [['diamond', 2, 4, 0.7], ['netherite_scrap', 1, 2, 0.4], ['golden_apple', 1, 2, 0.5], ['ENCH:diamond_sword', 1, 1, 0.25], ['TBOOK', 1, 1, 0.4], ['gold_block', 1, 2, 0.5]],
+    ob5: [['void_pearl', 1, 4, 0.6], ['emerald', 2, 6, 0.5], ['gold_ingot', 2, 6, 0.5], ['iron_ingot', 3, 8, 0.5], ['rocket', 3, 10, 0.4], ['diamond', 1, 3, 0.3], ['golden_apple', 1, 1, 0.15], ['BOOK', 1, 1, 0.3], ['TBOOK', 1, 1, 0.15], ['ENCH:diamond_pickaxe', 1, 1, 0.12], ['ENCH:diamond_sword', 1, 1, 0.1]],
+    ob5r: [['diamond', 3, 6, 0.9], ['enchanted_golden_apple', 1, 1, 0.3], ['ENCH:diamond_chest', 1, 1, 0.4], ['netherite_scrap', 1, 3, 0.5], ['TBOOK', 1, 1, 0.6], ['void_pearl', 2, 6, 0.8]]
+  };
+  window.LOOT_TABLES = LT;
+  const prev = makeLoot;
+  const roll = (T_, r, items, slot) => { let n = 0; for (const [k, a, b, ch] of T_) { if (r() > ch) continue;
+    if (k === 'BOOK') { items[slot()] = { id: IID.enchanted_book, c: 1, e: rollEnchants(IID.book, 10 + r() * 18, r) }; n++; continue; }
+    if (k === 'TBOOK') { const tr = Object.keys(ENCH).filter(q => ENCH[q].treasure), kk = tr[r() * tr.length | 0]; if (kk) { items[slot()] = { id: IID.enchanted_book, c: 1, e: { [kk]: 1 + (r() * ENCH[kk].max | 0) } }; n++; } continue; }
+    if (k.startsWith('ENCH:')) { const eid = IID[k.slice(5)]; if (eid !== undefined) { items[slot()] = { id: eid, c: 1, e: rollEnchants(eid, 18 + r() * 18, r) }; n++; } continue; }
+    const id = IID[k]; if (id === undefined) continue; items[slot()] = { id, c: Math.min(maxStack(id), a + Math.floor(r() * (b - a + 1))) }; n++; } return n; };
+  makeLoot = function (kind, r, meta) {
+    const T_ = LT[kind]; if (!T_) return prev(kind, r, meta);
+    const items = new Array(27).fill(null), slot = () => { for (let t = 0; t < 40; t++) { const i = r() * 27 | 0; if (!items[i]) return i; } return items.indexOf(null) < 0 ? 0 : items.indexOf(null); };
+    let n = roll(T_, r, items, slot);
+    // baú nunca vem vazio demais: garante pelo menos 3 coisas, tirando só dos itens comuns da lista
+    for (let t = 0; n < 3 && t < 6; t++) { const common = T_.filter(e => e[3] >= 0.3); const e = common[r() * common.length | 0]; if (!e) break; n += roll([[e[0], e[1], e[2], 1]], r, items, slot); }
+    if (meta && meta.core) items[slot()] = { id: IID.heavy_core, c: 1 };
+    if (meta && meta.core && r() < 0.8) items[slot()] = { id: IID.breeze_rod, c: 1 + (r() * 2 | 0) };
+    if (meta && meta.wings) items[slot()] = { id: IID.void_wings, c: 1 };
+    return items;
+  };
+})();
+
 // ================= SOM ABAFADO: longe ou atrás de blocos (cavernas, paredes) o som perde os agudos =================
 (function () {
   let pend = null, pendT = 0;
@@ -8970,6 +9016,71 @@ body.chopen #touchui,body.chopen #chatlog,body.chopen #itemname,body.chopen #hot
   cv.addEventListener('touchstart', () => { if (G.worldLocked()) G.needLift = true; else G.needLift = false; }, { passive: true, capture: true });
   // perder o foco (trocar de app, notificação) solta tudo
   window.addEventListener('blur', () => clearActs(G)); document.addEventListener('visibilitychange', () => { if (document.hidden) clearActs(G); });
+})();
+
+// ================= PLACAR LATERAL (One Block, Arena, KitPvP) + contagem "Próxima fase em" =================
+(function () {
+  const en = () => S.lang === 'en';
+  const st = document.createElement('style');
+  st.textContent = `#sboard{position:absolute;right:6px;top:34%;transform:translateY(-50%);min-width:190px;max-width:42vw;background:rgba(0,0,0,.38);padding:4px 0 6px;display:none;font-size:19px;line-height:1.25;text-shadow:2px 2px #000;pointer-events:none;color:#fff}
+#sboard .t{text-align:center;color:#ffd84a;padding:2px 10px 4px;background:rgba(0,0,0,.25);margin-bottom:3px;letter-spacing:1px}
+#sboard .l{display:flex;justify-content:space-between;gap:14px;padding:0 10px;white-space:nowrap}
+#sboard .l b{font-weight:normal;color:#ff6b6b}#sboard .l.g b{color:#7dff7d}#sboard .l.y b{color:#ffd84a}
+#sboard .pb{margin:5px 10px 0;height:7px;background:rgba(255,255,255,.15)}#sboard .pb div{height:100%;background:linear-gradient(90deg,#4caf50,#8bc34a);width:0;transition:width .25s}
+#obcount{position:absolute;left:0;right:0;top:20%;text-align:center;pointer-events:none;display:none;text-shadow:3px 3px #000}
+#obcount .s{font-size:26px;color:#fff}#obcount .n{font-size:60px;color:#ffd84a;display:inline-block;line-height:1}
+#obcount.pop .n{animation:obpop .45s ease-out}@keyframes obpop{0%{transform:scale(2.1);color:#fff}60%{transform:scale(.92)}100%{transform:scale(1)}}
+#obphase{position:absolute;left:0;right:0;top:16%;text-align:center;pointer-events:none;opacity:0;transition:opacity .6s;text-shadow:3px 3px #000}
+#obphase .a{font-size:30px;color:#ffd84a}#obphase .b{font-size:54px;color:#fff}#obphase .c{font-size:20px;color:#bbb}
+@media (max-height:480px){#sboard{font-size:15px;min-width:150px;top:30%}#obcount .n{font-size:46px}#obcount .s{font-size:20px}#obphase .b{font-size:40px}}`;
+  document.head.appendChild(st);
+  const hud = document.getElementById('hud');
+  const sb = document.createElement('div'); sb.id = 'sboard'; sb.setAttribute('data-noi18n', ''); hud.appendChild(sb);
+  const cd = document.createElement('div'); cd.id = 'obcount'; cd.setAttribute('data-noi18n', ''); cd.innerHTML = '<div class="s"></div><div class="n"></div>'; hud.appendChild(cd);
+  const pf = document.createElement('div'); pf.id = 'obphase'; pf.setAttribute('data-noi18n', ''); pf.innerHTML = '<div class="a"></div><div class="b"></div><div class="c"></div>'; hud.appendChild(pf);
+  const isClient = () => window.NET && NET.role === 'client';
+  const T = () => (G.world && G.world.dim === 'overworld' && G.world.wtype) || 'normal';
+  const esc = s => String(s).replace(/[&<>]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;' }[c]));
+  let lastHtml = '', lastN = -1, lastShown = -1, pfT = 0;
+  const set = (title, lines, prog) => { let h = '<div class="t">' + esc(title) + '</div>'; for (const [k, v, c] of lines) h += '<div class="l' + (c ? ' ' + c : '') + '"><span>' + esc(k) + '</span><b>' + esc(v) + '</b></div>'; if (prog !== undefined) h += '<div class="pb"><div style="width:' + (Math.max(0, Math.min(1, prog)) * 100).toFixed(1) + '%"></div></div>'; if (h !== lastHtml) { sb.innerHTML = h; lastHtml = h; } sb.style.display = 'block'; };
+  const hideAll = () => { sb.style.display = 'none'; cd.style.display = 'none'; };
+  window.SCORE = {
+    phaseUp(ph, i) { const a = pf.children; a[0].textContent = (en() ? 'Phase ' : 'Fase ') + (i + 1); a[1].textContent = en() ? ph.en : ph.pt; a[2].textContent = en() ? 'New blocks, mobs and chests!' : 'Novos blocos, mobs e baús!'; pf.style.opacity = 1; pfT = 3.2; cd.style.display = 'none'; try { Snd.play('levelup', 0.8); } catch (e) { } }
+  };
+  function obCount() { if (isClient()) return NET.envOb; const b = G.world && G.world.bdata && G.world.bdata.oneblock; return b ? b.n : 0; }
+  let prevT = performance.now();
+  function tick() {
+    requestAnimationFrame(tick);
+    const now = performance.now(), dt = Math.min(0.2, (now - prevT) / 1000); prevT = now;
+    if (pfT > 0) { pfT -= dt; if (pfT <= 0) pf.style.opacity = 0; }
+    if (!G.world || G.state !== 'play' || !window.MODE_STATE) { hideAll(); return; }
+    const t = T(), M = MODE_STATE;
+    if (t === 'oneblock') {
+      const n = obCount(); if (n === undefined || n === null) { hideAll(); return; }
+      const ph = M.phaseOf(n), i = M.PH.indexOf(ph), nx = M.PH[i + 1];
+      // convidado: percebe a troca de fase pelo número que veio do anfitrião
+      if (isClient() && lastN >= 0 && n > lastN && M.phaseOf(lastN) !== ph) SCORE.phaseUp(ph, i);
+      lastN = n;
+      const lines = [[en() ? 'Phase' : 'Fase', (en() ? ph.en : ph.pt), 'y'], [en() ? 'Level' : 'Nível', (i + 1) + '/' + M.PH.length, 'y'], [en() ? 'Blocks broken' : 'Blocos quebrados', n.toLocaleString(en() ? 'en-US' : 'pt-BR'), 'g']];
+      if (nx) lines.push([en() ? 'Next phase in' : 'Próxima fase em', String(nx.n - n)]); else lines.push([en() ? 'Next phase' : 'Próxima fase', en() ? 'Max' : 'Máx', 'y']);
+      set('ONE BLOCK', lines, nx ? (n - ph.n) / (nx.n - ph.n) : 1);
+      // contagem nos últimos blocos antes da próxima fase: o número estoura e cresce a cada bloco
+      const left = nx ? nx.n - n : 0;
+      if (nx && left <= 10 && pfT <= 0) {
+        if (left !== lastShown) { lastShown = left; cd.children[0].textContent = en() ? 'Upgrading in' : 'Próxima fase em'; const el = cd.children[1]; el.textContent = left; el.style.fontSize = (44 + (11 - left) * 7) + 'px'; el.style.color = left <= 3 ? '#ff5a4a' : '#ffd84a'; cd.classList.remove('pop'); void cd.offsetWidth; cd.classList.add('pop'); if (left <= 5) try { Snd.play('click', 0.6 + (6 - left) * 0.08); } catch (e) { } }
+        cd.style.display = 'block';
+      } else { cd.style.display = 'none'; lastShown = -1; }
+      return;
+    }
+    cd.style.display = 'none'; lastN = -1;
+    if (t === 'arena') { const cl = isClient(), wave = cl ? (NET.envAw || 0) : M.A.wave, best = cl ? (NET.envAb || 0) : (M.best().arenaBest || 0), alive = cl ? null : M.A.alive.filter(e => !e.dead && !e.dying).length;
+      const lines = [[en() ? 'Wave' : 'Onda', String(wave), 'y']]; if (alive !== null) lines.push([en() ? 'Monsters' : 'Monstros', String(alive)]); lines.push([en() ? 'Best' : 'Recorde', String(Math.max(best, wave - 1)), 'g']);
+      set(en() ? 'MONSTER ARENA' : 'ARENA', lines); return; }
+    if (t === 'kitpvp') { const K = M.K, best = isClient() ? Math.max(K.best || 0, K.streak) : (M.best().kitBest || 0);
+      set('KITPVP', [[en() ? 'Kills' : 'Abates', String(K.kills), 'g'], [en() ? 'Streak' : 'Sequência', String(K.streak)], [en() ? 'Best' : 'Recorde', String(best), 'y']]); return; }
+    hideAll();
+  }
+  requestAnimationFrame(tick);
 })();
 
 // ================= OVELHAS COLORIDAS + TESOURA + CORANTE NA OVELHA + LÃ QUE VOLTA =================
