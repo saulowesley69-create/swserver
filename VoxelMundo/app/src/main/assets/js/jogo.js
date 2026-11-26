@@ -1850,6 +1850,77 @@ window.STATE_ITEM = window.STATE_ITEM || {};
   window.GLASS_ITEM = { 244: GLASS_COLORS.map(c => IID[c[0] + '_stained_glass']), 245: GLASS_COLORS.map(c => IID[c[0] + '_stained_glass_pane']) };
 })();
 
+// ================= REDSTONE: blocos, desenhos, itens e receitas (a simulação fica em 09zzzz_redstone.js) =================
+// Estados guardados no bloco (como a cor do vidro):
+//   fio: força 0..15 · alavanca/botão: lado preso (1..6) + 8 se ligado · placa: 1 = pisada · repetidor: 1 + direção + 4*(atraso-1) + 16 se ligado
+(function () {
+  const T0 = [0, 0, 0, 0];
+  retile('redstone_dust', (px, r) => { for (let y = 0; y < 16; y++) for (let x = 0; x < 16; x++) { const d = Math.hypot(x - 7.5, y - 7.5); px(x, y, d < 2.6 || (r() < 0.22 && d < 7.5) ? [235, 235, 235, 255] : [210, 210, 210, r() < 0.5 ? 255 : 0]); } });
+  retile('lever_base', (px, r) => { for (let y = 0; y < 16; y++) for (let x = 0; x < 16; x++) { const v = 112 + r() * 26 | 0; px(x, y, (x + y) % 5 === 0 ? [v - 30, v - 30, v - 30] : [v, v, v]); } });
+  retile('lever_stick', (px, r) => { for (let y = 0; y < 16; y++) for (let x = 0; x < 16; x++) px(x, y, y < 3 ? [180, 40, 30] : [140 + (x % 2) * 18, 104, 60]); });
+  retile('redstone_torch', (px, r) => { for (let y = 0; y < 16; y++) for (let x = 0; x < 16; x++) px(x, y, T0); for (let y = 8; y < 16; y++) { px(7, y, [120, 90, 50]); px(8, y, [95, 70, 40]); } for (const [x, y, c] of [[7, 6, [255, 120, 90]], [8, 6, [240, 60, 40]], [7, 7, [230, 40, 30]], [8, 7, [200, 30, 20]], [6, 6, [150, 20, 15]], [9, 7, [150, 20, 15]], [7, 5, [255, 170, 150]]]) px(x, y, c); });
+  retile('redstone_torch_off', (px, r) => { for (let y = 0; y < 16; y++) for (let x = 0; x < 16; x++) px(x, y, T0); for (let y = 8; y < 16; y++) { px(7, y, [120, 90, 50]); px(8, y, [95, 70, 40]); } for (const [x, y, c] of [[7, 6, [110, 40, 34]], [8, 6, [90, 30, 26]], [7, 7, [80, 26, 22]], [8, 7, [70, 22, 18]]]) px(x, y, c); });
+  const lamp = on => (px, r) => { for (let y = 0; y < 16; y++) for (let x = 0; x < 16; x++) { const edge = x === 0 || y === 0 || x === 15 || y === 15, grid = x % 5 === 0 || y % 5 === 0; const c = on ? (grid ? [176, 110, 50] : r() < 0.3 ? [255, 236, 170] : [248, 200, 110]) : (grid ? [70, 44, 26] : r() < 0.3 ? [150, 100, 60] : [118, 76, 44]); px(x, y, edge ? (on ? [150, 96, 46] : [60, 38, 22]) : c); } };
+  retile('redstone_lamp', lamp(false)); retile('redstone_lamp_on', lamp(true));
+  retile('repeater_top', (px, r) => { for (let y = 0; y < 16; y++) for (let x = 0; x < 16; x++) { const v = 150 + r() * 20 | 0; px(x, y, [v, v, v]); } for (let y = 1; y < 15; y++) { px(7, y, [120, 30, 26]); px(8, y, [150, 36, 30]); } for (const x of [5, 6, 7, 8, 9, 10]) px(x, 3, [150, 36, 30]); px(6, 2, [150, 36, 30]); px(9, 2, [150, 36, 30]); });
+  const iron = top => (px, r) => { for (let y = 0; y < 16; y++) for (let x = 0; x < 16; x++) { const v = 196 + r() * 22 | 0; px(x, y, (x === 0 || x === 15 || (top ? y === 0 : y === 15)) ? [120, 120, 124] : [v, v, v + 4]); }
+    if (top) { for (let y = 3; y < 11; y++) for (let x = 3; x < 13; x++) px(x, y, (x === 3 || x === 12 || y === 3 || y === 10 || x === 7 || x === 8) ? [130, 130, 134] : [60, 64, 70, 255]); } else { for (let y = 2; y < 14; y += 3) for (let x = 2; x < 14; x++) px(x, y, [150, 150, 154]); px(12, 6, [90, 90, 94]); px(12, 7, [90, 90, 94]); } };
+  retile('iron_door_top', iron(true)); retile('iron_door_bottom', iron(false));
+  const add = (id, key, name, o) => { const b = defBlock(id, key, name, o); if (o.opaque === false) OPAQ[id] = 0; if (o.solid === false) SOLID[id] = 0; if (o.light) LIGHT_BLOCKS.add(id); return b; };
+  const EN0 = typeof EN !== 'undefined' ? EN : null, en = (k, v) => { if (EN0) EN0[k] = v; };
+  add(247, 'redstone_wire', 'Pó de Redstone', { solid: false, opaque: false, shape: 'box', boxes: 'rs_wire', hard: 0, t: 'redstone_dust', drop: 'redstone', creative: false, snd: 'stone' });
+  add(248, 'lever', 'Alavanca', { solid: false, opaque: false, shape: 'box', boxes: 'lever', hard: 0.5, t: 'lever_base', snd: 'stone' }); en('lever', 'Lever');
+  add(249, 'stone_button', 'Botão de Pedra', { solid: false, opaque: false, shape: 'box', boxes: 'button', hard: 0.5, t: 'stone', snd: 'stone' }); en('stone_button', 'Stone Button');
+  add(250, 'wood_button', 'Botão de Madeira', { solid: false, opaque: false, shape: 'box', boxes: 'button', hard: 0.5, t: 'planks', snd: 'wood' }); en('wood_button', 'Wooden Button');
+  add(251, 'stone_plate', 'Placa de Pressão de Pedra', { solid: false, opaque: false, shape: 'box', boxes: 'plate', hard: 0.5, t: 'stone', snd: 'stone' }); en('stone_plate', 'Stone Pressure Plate');
+  add(252, 'wood_plate', 'Placa de Pressão de Madeira', { solid: false, opaque: false, shape: 'box', boxes: 'plate', hard: 0.5, t: 'planks', snd: 'wood' }); en('wood_plate', 'Wooden Pressure Plate');
+  add(253, 'repeater', 'Repetidor de Redstone', { opaque: false, shape: 'box', boxes: 'repeater', hard: 0, t: { top: 'repeater_top', side: 'stone', bottom: 'stone' }, snd: 'stone' }); en('repeater', 'Redstone Repeater');
+  add(254, 'redstone_lamp', 'Lâmpada de Redstone', { hard: 0.3, t: 'redstone_lamp', snd: 'glass' }); en('redstone_lamp', 'Redstone Lamp');
+  add(255, 'redstone_lamp_on', 'Lâmpada de Redstone', { hard: 0.3, t: 'redstone_lamp_on', snd: 'glass', light: 15, drop: 'redstone_lamp', creative: false });
+  add(143, 'redstone_torch', 'Tocha de Redstone', { solid: false, opaque: false, torch: true, hard: 0, light: 7, t: 'redstone_torch', snd: 'wood' }); en('redstone_torch', 'Redstone Torch');
+  add(144, 'redstone_torch_off', 'Tocha de Redstone', { solid: false, opaque: false, torch: true, hard: 0, t: 'redstone_torch_off', snd: 'wood', drop: 'redstone_torch', creative: false });
+  add(141, 'iron_door', 'Porta de Ferro', { t: 'iron_door_bottom', opaque: false, shape: 'door', hard: 5, tool: 'pickaxe', tier: 0, snd: 'stone' }); en('iron_door', 'Iron Door');
+  add(142, 'iron_door_open', 'Porta de Ferro', { t: 'iron_door_bottom', opaque: false, solid: false, shape: 'door', hard: 5, tool: 'pickaxe', tier: 0, snd: 'stone', creative: false, drop: 141 });
+  BL[141].flat = BL[142].flat = true;
+  for (const k of ['lever', 'stone_button', 'wood_button', 'stone_plate', 'wood_plate', 'repeater', 'redstone_lamp', 'redstone_torch', 'iron_door']) defItem(BID[k], k, BL[BID[k]].name, { block: BID[k], cat: 'blocks' });
+  // o pó de redstone vira fio quando colocado
+  if (IID.redstone !== undefined) IT[IID.redstone].block = 247;
+  // receitas (como no jogo original)
+  shaped(['S', 'C'], { S: 'stick', C: 'cobble' }, 'lever');
+  shapeless(['stone'], 'stone_button'); shapeless(['planks'], 'wood_button');
+  shaped(['SS'], { S: 'stone' }, 'stone_plate'); shaped(['PP'], { P: 'planks' }, 'wood_plate');
+  shaped(['R', 'S'], { R: 'redstone', S: 'stick' }, 'redstone_torch');
+  shaped([' R ', 'RGR', ' R '], { R: 'redstone', G: 'glowstone' }, 'redstone_lamp');
+  shaped(['TRT', 'SSS'], { T: 'redstone_torch', R: 'redstone', S: 'stone' }, 'repeater');
+  shaped(['II', 'II', 'II'], { I: 'iron_ingot' }, 'iron_door', 3);
+  // ---------- formas ----------
+  // lado preso: 0 +x, 1 -x, 2 +y (em cima de bloco = chão), 3 -y (teto), 4 +z, 5 -z  (o bloco de apoio fica no lado contrário)
+  const FD = [[1, 0, 0], [-1, 0, 0], [0, 1, 0], [0, -1, 0], [0, 0, 1], [0, 0, -1]];
+  window.RS_FD = FD;
+  // caixa (em 16 avos) colada na face de apoio: largura w, altura h (para fora da face), comprimento l
+  function onFace(face, w, l, h) { const a = (16 - w) / 32, b = (16 - l) / 32, H = h / 16;
+    switch (face) { case 2: return [a, 0, b, 1 - a, H, 1 - b]; case 3: return [a, 1 - H, b, 1 - a, 1, 1 - b]; case 0: return [0, b, a, H, 1 - b, 1 - a]; case 1: return [1 - H, b, a, 1, 1 - b, 1 - a]; case 4: return [a, b, 0, 1 - a, 1 - b, H]; default: return [a, b, 1 - H, 1 - a, 1 - b, 1]; } }
+  window.rsState = (w, X, Y, Z) => (w && w.getAxis ? w.getAxis(X, Y, Z) : 0) || 0;
+  const bb = blockBoxes; blockBoxes = function (id, X, Y, Z, phys, world) {
+    const b = BL[id]; if (!b || !b.boxes) return bb.apply(this, arguments); const w = world || G.world, st = rsState(w, X, Y, Z);
+    switch (b.boxes) {
+      case 'rs_wire': { const out = [[5 / 16, 0, 5 / 16, 11 / 16, 1 / 16, 11 / 16]], c = rsWireConn(w, X, Y, Z); if (c[0]) out.push([11 / 16, 0, 5.5 / 16, 1, 1 / 16, 10.5 / 16]); if (c[1]) out.push([0, 0, 5.5 / 16, 5 / 16, 1 / 16, 10.5 / 16]); if (c[2]) out.push([5.5 / 16, 0, 11 / 16, 10.5 / 16, 1 / 16, 1]); if (c[3]) out.push([5.5 / 16, 0, 0, 10.5 / 16, 1 / 16, 5 / 16]); return out; }
+      case 'lever': { const face = st ? ((st - 1) & 7) : 2; return [onFace(face, 6, 8, 3)]; }
+      case 'button': { const face = st ? ((st - 1) & 7) : 2, on = st >= 9; return [onFace(face, 6, 4, on ? 1 : 2)]; }
+      case 'plate': return [[1 / 16, 0, 1 / 16, 15 / 16, (st ? 0.5 : 1) / 16, 15 / 16]];
+      case 'repeater': return [[0, 0, 0, 1, 2 / 16, 1]];
+    }
+    return bb.apply(this, arguments); };
+  // ligações do fio: fio, componentes, e fio um degrau acima/abaixo
+  const CONN = new Set();
+  window.rsWireConn = function (w, X, Y, Z) { if (!CONN.size) for (const k of ['redstone_wire', 'lever', 'stone_button', 'wood_button', 'stone_plate', 'wood_plate', 'redstone_torch', 'redstone_torch_off', 'redstone_lamp', 'redstone_lamp_on', 'repeater']) CONN.add(BID[k]);
+    const r = [0, 0, 0, 0]; if (!w || !w.getBlock) return r; const D = [[1, 0], [-1, 0], [0, 1], [0, -1]];
+    for (let i = 0; i < 4; i++) { const x = X + D[i][0], z = Z + D[i][1], n = w.getBlock(x, Y, z); if (CONN.has(n)) { if (n === BID.repeater) { const s = rsState(w, x, Y, z), d = s ? ((s - 1) & 3) : 0; if (d === 1 || d === 3 ? D[i][0] === 0 : D[i][1] === 0) continue; } r[i] = 1; continue; }
+      if (w.getBlock(x, Y - 1, z) === 247 && !OPAQ[n]) { r[i] = 1; continue; } if (w.getBlock(x, Y + 1, z) === 247 && !OPAQ[w.getBlock(X, Y + 1, Z)]) { r[i] = 1; continue; } }
+    if (!r[0] && !r[1] && (r[2] || r[3])) { r[2] = r[3] = 1; } else if (!r[2] && !r[3] && (r[0] || r[1])) { r[0] = r[1] = 1; }
+    return r; };
+})();
+
 // ================= MUNDO =================
 const CS = 16, WH = 160, NH = 96, SEA = 40;
 const ckey = (cx, cz) => cx + ',' + cz;
@@ -2184,7 +2255,7 @@ class World {
       const T = 3 / 16; return side === 0 ? [1 - T, 0, 0, 1, 1, 1] : side === 1 ? [0, 0, 0, T, 1, 1] : side === 2 ? [0, 0, 1 - T, 1, 1, 1] : [0, 0, 0, 1, 1, T]; }
     if (b.torch) { const tw = wallTorch(this, x, y, z); if (tw) { const cx = 0.5 + tw[0] * 0.3, cz = 0.5 + tw[1] * 0.3; return [cx - 0.15, 0.2, cz - 0.15, cx + 0.15, 0.82, cz + 0.15]; } return [0.4, 0, 0.4, 0.6, 0.62, 0.6]; }
     if (b.cross) return id === BID.fire ? [0, 0, 0, 1, 0.06, 1] : [0.18, 0, 0.18, 0.82, id === BID.sugarcane ? 1 : 0.8, 0.82];
-    if (b.shape === 'door') { const bd = this.bdata && this.bdata[x + ',' + y + ',' + z]; const f0 = bd && bd.f !== undefined ? bd.f : 5, side = id === BID.door_open ? ({ 2: 5, 3: 5, 4: 3, 5: 3 })[f0] : f0, T3 = 3 / 16; return side === 2 ? [1 - T3, 0, 0, 1, 1, 1] : side === 3 ? [0, 0, 0, T3, 1, 1] : side === 4 ? [0, 0, 1 - T3, 1, 1, 1] : [0, 0, 0, 1, 1, T3]; }
+    if (b.shape === 'door') { const bd = this.bdata && this.bdata[x + ',' + y + ',' + z]; const f0 = bd && bd.f !== undefined ? bd.f : 5, side = (id === BID.door_open || id === BID.iron_door_open) ? ({ 2: 5, 3: 5, 4: 3, 5: 3 })[f0] : f0, T3 = 3 / 16; return side === 2 ? [1 - T3, 0, 0, 1, 1, 1] : side === 3 ? [0, 0, 0, T3, 1, 1] : side === 4 ? [0, 0, 1 - T3, 1, 1, 1] : [0, 0, 0, 1, 1, T3]; }
     if (b.boxes) { const bx = blockBoxes(id, x, y, z, false, this); if (!bx.length) return [0, 0, 0, 1, 1, 1]; const u = [1, 1, 1, 0, 0, 0]; for (const q of bx) for (let a = 0; a < 3; a++) { u[a] = Math.min(u[a], q[a]); u[a + 3] = Math.max(u[a + 3], q[a + 3]); } return u; }
     if (BH[id] < 1) return [0, 0, 0, 1, BH[id], 1];
     return null;
@@ -2215,7 +2286,7 @@ class World {
 function liqH(id, above) { if (LIQT[above] === LIQT[id]) return 1; const l = LVL[id]; if (l === 0 || l === 8) return 0.875; return Math.max(0.12, (8 - l) / 9); }
 // troncos deitados: o mesmo bloco, só guarda o eixo (1 = ao longo de X, 2 = ao longo de Z). Nas mudanças salvas fica id + 256*eixo.
 const AXIAL = new Uint8Array(256), LOGAX = new Uint8Array(256); for (const b of BL) if (b && /^(log|.+_log|crimson_stem|warped_stem|hay|basalt|void_pillar)$/.test(b.key)) AXIAL[b.id] = LOGAX[b.id] = 1;
-for (const k of ['stained_glass', 'stained_glass_pane', 'wool_dyed', 'bed', 'bed_foot']) if (BID[k] !== undefined) AXIAL[BID[k]] = 1; // estado = cor (1..16)
+for (const k of ['stained_glass', 'stained_glass_pane', 'wool_dyed', 'bed', 'bed_foot', 'redstone_wire', 'lever', 'stone_button', 'wood_button', 'stone_plate', 'wood_plate', 'repeater']) if (BID[k] !== undefined) AXIAL[BID[k]] = 1; // estado = cor (1..16)
 function applyMods(c, m) { const d = c.data; for (const i in m) { const v = m[i]; d[i] = v; if (c.ax) c.ax.delete(+i); if (v > 255) (c.ax || (c.ax = new Map())).set(+i, v >> 8); } }
 const FACES = [
   { d: [0, 1, 0], c: [[0, 1, 0], [0, 1, 1], [1, 1, 1], [1, 1, 0]], t: 'top', s: 1.0 },
@@ -2330,8 +2401,9 @@ function meshChunk(world, ch) {
     if (b.boxes) {
       const sky = skyL(x, y, z), bl = lights.length ? blkL(x, y, z) : 0;
       if (b.boxes === 'rail') { const rs = railShape(world, ch.cx * 16 + x, y, ch.cz * 16 + z, id); if (rs.asc) { emitRailSlope(S_, x, y, z, rs, Math.max(sky, skyL(x, y + 1, z)), Math.max(bl, lights.length ? blkL(x, y + 1, z) : 0)); continue; } }
-      const pst = b.boxes === 'pane' && AXIAL[id] && ch.ax ? (ch.ax.get((y * 16 + z) * 16 + x) || 0) : 0;
-      emitBoxes(b.translucent ? G_ : S_, blockBoxes(id, ch.cx * 16 + x, y, ch.cz * 16 + z, false, world), x, y, z, b.boxes === 'rail' ? railTex(world, ch.cx * 16 + x, y, ch.cz * 16 + z, id) : b.tex, sky, bl, f => { const F = FACES[f], n = get(x + F.d[0], y + F.d[1], z + F.d[2]); return OPAQ[n] && !BL[n].boxes; }, 1, false, pst && window.GLASS_TINT ? GLASS_TINT[pst - 1] : null);
+      const pst = AXIAL[id] && ch.ax ? (ch.ax.get((y * 16 + z) * 16 + x) || 0) : 0, BX = window.BOX_EXTRA && BOX_EXTRA[b.boxes];
+      if (BX && BX(S_, world, ch.cx * 16 + x, y, ch.cz * 16 + z, x, z, pst, sky, bl, id)) continue; // blocos de redstone com várias peças
+      emitBoxes(b.translucent ? G_ : S_, blockBoxes(id, ch.cx * 16 + x, y, ch.cz * 16 + z, false, world), x, y, z, b.boxes === 'rail' ? railTex(world, ch.cx * 16 + x, y, ch.cz * 16 + z, id) : b.tex, sky, bl, f => { const F = FACES[f], n = get(x + F.d[0], y + F.d[1], z + F.d[2]); return OPAQ[n] && !BL[n].boxes; }, 1, false, b.boxes === 'pane' && pst && window.GLASS_TINT ? GLASS_TINT[pst - 1] : null);
       continue;
     }
     if (b.shape === 'bed') {
@@ -2345,7 +2417,7 @@ function meshChunk(world, ch) {
     }
     if (b.shape) {
       let mn = [0, 0, 0], mx = [1, 1, 1], tx = b.tex;
-      { const bd = world.bdata[(ch.cx * 16 + x) + ',' + y + ',' + (ch.cz * 16 + z)]; const f0 = bd && bd.f !== undefined ? bd.f : 5, side = id === BID.door_open ? ({ 2: 5, 3: 5, 4: 3, 5: 3 })[f0] : f0, T3 = 3 / 16; if (side === 2) mn = [1 - T3, 0, 0]; else if (side === 3) mx = [T3, 1, 1]; else if (side === 4) mn = [0, 0, 1 - T3]; else mx = [1, 1, T3]; const t = BL[get(x, y - 1, z)].shape === 'door' ? T.door_top : T.door_bottom; tx = { top: t, bottom: t, side: t }; }
+      { const bd = world.bdata[(ch.cx * 16 + x) + ',' + y + ',' + (ch.cz * 16 + z)]; const f0 = bd && bd.f !== undefined ? bd.f : 5, side = (id === BID.door_open || id === BID.iron_door_open) ? ({ 2: 5, 3: 5, 4: 3, 5: 3 })[f0] : f0, T3 = 3 / 16; if (side === 2) mn = [1 - T3, 0, 0]; else if (side === 3) mx = [T3, 1, 1]; else if (side === 4) mn = [0, 0, 1 - T3]; else mx = [1, 1, T3]; const IR = id === BID.iron_door || id === BID.iron_door_open, t = BL[get(x, y - 1, z)].shape === 'door' ? (IR ? T.iron_door_top : T.door_top) : (IR ? T.iron_door_bottom : T.door_bottom); tx = { top: t, bottom: t, side: t }; }
       const sky = skyL(x, y, z), bl = lights.length ? blkL(x, y, z) : 0;
       for (let f = 0; f < 6; f++) { const F = FACES[f]; if (b.shape === 'bed' && f === 1 && OPAQ[get(x, y - 1, z)]) continue; const t = F.t === 'top' ? tx.top : F.t === 'bottom' ? tx.bottom : tx.side; for (let k = 0; k < 4; k++) { const c = F.c[k]; verts[k] = [x + mn[0] + c[0] * (mx[0] - mn[0]), y + mn[1] + c[1] * (mx[1] - mn[1]), z + mn[2] + c[2] * (mx[2] - mn[2])]; uvs[k] = tileUV(t, FUV[k][0], f > 1 ? mn[1] + c[1] * (mx[1] - mn[1]) : FUV[k][1]); cols[k] = F.s; } pushQuad(S_, verts, uvs, cols, sky, bl, false); }
       continue;
@@ -8087,7 +8159,8 @@ MOB_CLASS.villager = function (x, y, z) { return new Villager(x, y, z, Math.floo
       'dandelion', 'poppy', 'cornflower', 'allium', 'orange_tulip', 'oxeye_daisy', 'tallgrass', 'deadbush', 'vine', 'cactus', 'sugarcane', 'pumpkin', 'melon', 'brown_mushroom', 'red_mushroom', 'brown_mushroom_block', 'red_mushroom_block', 'mushroom_stem', 'cobweb', 'coral_plant', 'coral_flower',
       'netherrack', 'nether_quartz_ore', 'nether_gold_ore', 'ancient_debris', 'soul_sand', 'soul_soil', 'magma', 'glowstone', 'crimson_nylium', 'warped_nylium', 'nether_wart_block', 'warped_wart_block', 'shroomlight', 'crimson_roots', 'warped_roots', 'end_stone', 'dragon_egg'],
     functional: ['crafting_table', 'furnace', 'chest', 'void_chest', 'bookshelf', 'enchanting_table', 'anvil', 'bed', 'door', 'ladder', 'torch', 'spawner', 'end_frame', 'rune_stone', 'void_rod', 'ominous_banner'],
-    transport: ['rail', 'minecart', 'chest_minecart', 'boat', 'saddle', 'tnt', 'redstone', 'rocket', 'void_wings'],
+    redstone: ['redstone', 'redstone_torch', 'repeater', 'lever', 'stone_button', 'wood_button', 'stone_plate', 'wood_plate', 'redstone_lamp', 'iron_door', 'door', 'tnt', 'redstone_ore'],
+    transport: ['rail', 'minecart', 'chest_minecart', 'boat', 'saddle', 'rocket', 'void_wings'],
     tools: [...TIERS.flatMap(t => ['pickaxe', 'axe', 'shovel', 'hoe'].map(x => t + '_' + x)), 'flint_steel', 'fishing_rod', 'bucket', 'water_bucket', 'lava_bucket', 'bone_meal'],
     combat: [...TIERS.flatMap(t => [t + '_sword', t + '_spear']), 'mace', 'bow', 'arrow', 'shield', 'totem', 'wind_charge',
       ...['leather', 'copper', 'gold', 'iron', 'diamond', 'netherite'].flatMap(t => ['helmet', 'chest', 'legs', 'boots'].map(x => t + '_' + x))],
@@ -8107,7 +8180,7 @@ MOB_CLASS.villager = function (x, y, z) { return new Villager(x, y, z, Math.floo
     return 'materials';
   }
   const TABS = {
-    left: [['inv', 'Inventário', 'Inventory', 'chest'], ['building', 'Construção', 'Building Blocks', 'bricks'], ['colored', 'Coloridos', 'Colored Blocks', 'wool_red'], ['natural', 'Natureza', 'Natural Blocks', 'grass'], ['functional', 'Utilidades', 'Functional Blocks', 'crafting_table'], ['transport', 'Transporte', 'Transport', 'minecart'], ['search', 'Pesquisar', 'Search', null]],
+    left: [['inv', 'Inventário', 'Inventory', 'chest'], ['building', 'Construção', 'Building Blocks', 'bricks'], ['colored', 'Coloridos', 'Colored Blocks', 'wool_red'], ['natural', 'Natureza', 'Natural Blocks', 'grass'], ['functional', 'Utilidades', 'Functional Blocks', 'crafting_table'], ['redstone', 'Redstone', 'Redstone', 'redstone'], ['transport', 'Transporte', 'Transport', 'minecart'], ['search', 'Pesquisar', 'Search', null]],
     right: [['tools', 'Ferramentas', 'Tools', 'iron_pickaxe'], ['combat', 'Combate', 'Combat', 'iron_sword'], ['food', 'Comida', 'Food', 'apple'], ['materials', 'Ingredientes', 'Ingredients', 'diamond'], ['potions', 'Poções', 'Potions', null], ['eggs', 'Ovos', 'Spawn Eggs', null], ['ench', 'Encantamentos', 'Enchantments', 'enchanted_book']]
   };
   const iconFor = (k, ic) => { if (ic && ICONS[K(ic)]) return ICONS[K(ic)]; if (k === 'potions') { const p = IT.find(i => i && i.cat === 'potions' && i.creative); return p && ICONS[p.id]; } if (k === 'eggs') { const p = IT.find(i => i && i.cat === 'eggs' && i.creative); return p && ICONS[p.id]; } return null; };
@@ -8750,6 +8823,126 @@ body.chopen #touchui,body.chopen #chatlog,body.chopen #itemname,body.chopen #hot
     const rev = this.sfxRev; this.master = lp; if (rev && pend.q) this.sfxRev = lp; // atrás da parede: sem eco "aberto"
     try { return pl(name, vol); } finally { this.master = real; this.sfxRev = rev; } };
   const mt = Snd.mat && Snd.mat.bind(Snd); if (mt) Snd.mat = function () { if (!pend || performance.now() - pendT > 4 || !this.ctx || !this.master) return mt.apply(this, arguments); const real = this.master, lp = this.ctx.createBiquadFilter(); lp.type = 'lowpass'; lp.frequency.value = pend.f; lp.connect(real); this.master = lp; try { return mt.apply(this, arguments); } finally { this.master = real; } };
+})();
+
+// ================= REDSTONE: simulação (10 vezes por segundo), desenho e uso =================
+// Fontes: alavanca, botão, placa de pressão, tocha de redstone, repetidor ligado.
+// Fio leva a força (15 e perde 1 por bloco). Bloco sólido encostado numa fonte fica "energizado" e liga o que estiver encostado nele.
+// Tocha apaga quando o bloco em que está presa recebe energia (inversor). Repetidor atrasa e renova o sinal (força 15).
+// Recebem energia: lâmpada, portas (madeira e ferro), TNT.
+(function () {
+  const W_ = 247, LEV = 248, SB = 249, WB = 250, SP = 251, WP = 252, REP = 253, LAMP = 254, LAMPON = 255, TOR = 143, TOROFF = 144, ID = 141, IDO = 142;
+  const RSIDS = new Set([W_, LEV, SB, WB, SP, WP, REP, LAMP, LAMPON, TOR, TOROFF, ID, IDO, BID.tnt, BID.door, BID.door_open]);
+  const FD = RS_FD, RD = [[0, -1], [1, 0], [0, 1], [-1, 0]], N6 = [[1, 0, 0], [-1, 0, 0], [0, 1, 0], [0, -1, 0], [0, 0, 1], [0, 0, -1]];
+  const K = (x, y, z) => x + ',' + y + ',' + z, P = k => k.split(',').map(Number);
+  const st = (w, x, y, z) => (w.getAxis ? w.getAxis(x, y, z) : 0) || 0;
+  const isSolid = id => !!(OPAQ[id] && SOLID[id] && !BL[id].boxes);
+  const set = w => w.rs || (w.rs = new Set());
+  // ---------- quem é componente (para não varrer o mundo todo) ----------
+  const bc = G.blockChanged; G.blockChanged = function (x, y, z, o, n) {
+    const r = bc.apply(this, arguments); const w = this.world; if (!w) return r;
+    if (RSIDS.has(n)) set(w).add(K(x, y, z)); w.rsDirty = true;
+    // posição inicial: alavanca/botão grudam no lado clicado; repetidor aponta para longe do jogador
+    if ((n === LEV || n === SB || n === WB) && o !== n && !st(w, x, y, z)) { const t = this.target; let f = 2; if (t && t.n) { const i = FD.findIndex(d => d[0] === t.n[0] && d[1] === t.n[1] && d[2] === t.n[2]); if (i >= 0) f = i; } w.setBlock(x, y, z, n, { ax: f + 1 }); }
+    if (n === REP && o !== REP && !st(w, x, y, z)) { const d = this.lookDir ? this.lookDir() : { x: 0, z: -1 }; const dir = Math.abs(d.x) > Math.abs(d.z) ? (d.x > 0 ? 1 : 3) : (d.z > 0 ? 2 : 0); w.setBlock(x, y, z, REP, { ax: 1 + dir }); }
+    // bloco de apoio sumiu: componentes presos nele caem
+    if (o && !n && isSolid(o)) for (let i = 0; i < 6; i++) { const X = x + FD[i][0], Y = y + FD[i][1], Z = z + FD[i][2], b = w.getBlock(X, Y, Z);
+      let falls = false; if (b === LEV || b === SB || b === WB) { const s = st(w, X, Y, Z), f = s ? (s - 1) & 7 : 2; falls = f === i; }
+      else if ((b === W_ || b === SP || b === WP || b === REP) && i === 2) falls = true;
+      else if (b === TOR || b === TOROFF) { const tw = wallTorch(w, X, Y, Z); falls = tw ? (X + tw[0] === x && Z + tw[1] === z && Y === y) : i === 2; }
+      if (falls) { w.setBlock(X, Y, Z, 0); if (this.player && this.player.mode !== 'creative' && !(window.NETX && NETX.isClient())) { const it = b === W_ ? IID.redstone : b === TOROFF ? IID.redstone_torch : b; dropItem(X + 0.5, Y + 0.3, Z + 0.5, it, 1); } } }
+    return r; };
+  // mundos salvos e estruturas geradas: acha os componentes
+  function scanWorld(w) { const S = set(w); for (const k in w.mods) { const m = w.mods[k], [cx, cz] = k.split(',').map(Number); for (const i in m) { const id = m[i] & 255; if (!RSIDS.has(id)) continue; const ii = +i, x = cx * 16 + (ii & 15), z = cz * 16 + ((ii >> 4) & 15), y = ii >> 8; S.add(K(x, y, z)); } } w.rsScanned = true; w.rsDirty = true; }
+  const gen = World.prototype.generate; World.prototype.generate = function (c) { const r = gen.apply(this, arguments); const d = c.data; for (let i = 0; i < d.length; i++) { const v = d[i]; if (v === SP || v === WP || v === LEV || v === TOR || v === W_ || v === SB || v === WB || v === REP) { set(this).add(K(c.cx * 16 + (i & 15), i >> 8, c.cz * 16 + ((i >> 4) & 15))); this.rsDirty = true; } } return r; };
+  // ---------- simulação ----------
+  let acc = 0; const btnT = new Map(), repQ = new Map(), torHist = new Map(), burnt = new Map(), doorMem = new Map();
+  function sim(w, dt) {
+    const S = set(w); if (!S.size) return; const now = performance.now() / 1000; let changed = false;
+    // botões soltam sozinhos
+    for (const [k, t] of btnT) { if (now >= t) { btnT.delete(k); const [x, y, z] = P(k), b = w.getBlock(x, y, z); if ((b === SB || b === WB) && st(w, x, y, z) >= 9) { w.setBlock(x, y, z, b, { ax: st(w, x, y, z) - 8 }); Snd.play('click', 0.4); } } }
+    // placas: alguém em cima?
+    const bodies = []; if (G.player && !G.player.dead) bodies.push([G.player.pos, 0.3, true]); if (window.NET && NET.peers) for (const pe of NET.peers) if (pe.proxy && !pe.proxy.dead && pe.proxy.dim === G.dim) bodies.push([pe.proxy.pos, 0.3, true]);
+    for (const e of G.entities) if (!e.dead && (e instanceof Mob || e instanceof ItemDrop)) bodies.push([e.pos, e.w || 0.25, e instanceof Mob]);
+    const comps = []; for (const k of S) { const [x, y, z] = P(k), id = w.getBlock(x, y, z); if (!RSIDS.has(id)) { if (w.chunks.has(ckey(x >> 4, z >> 4))) S.delete(k); continue; } comps.push([x, y, z, id, k]); }
+    for (const [x, y, z, id] of comps) if (id === SP || id === WP) { let on = 0; for (const [p, hw, mob] of bodies) { if (id === SP && !mob) continue; if (p.y >= y - 0.1 && p.y < y + 0.6 && p.x + hw > x + 1 / 16 && p.x - hw < x + 15 / 16 && p.z + hw > z + 1 / 16 && p.z - hw < z + 15 / 16) { on = 1; break; } }
+      if (on !== (st(w, x, y, z) ? 1 : 0)) { w.setBlock(x, y, z, id, { ax: on }); Snd.play('click', 0.3); } }
+    // fontes e blocos energizados
+    const src = new Map(), strong = new Set(), weak = new Set();
+    for (const [x, y, z, id, k] of comps) { const s = st(w, x, y, z);
+      if ((id === LEV || id === SB || id === WB) && s >= 9) { src.set(k, 15); const f = (s - 1) & 7, sx = x - FD[f][0], sy = y - FD[f][1], sz = z - FD[f][2]; if (isSolid(w.getBlock(sx, sy, sz))) strong.add(K(sx, sy, sz)); }
+      else if ((id === SP || id === WP) && s) { src.set(k, 15); if (isSolid(w.getBlock(x, y - 1, z))) strong.add(K(x, y - 1, z)); }
+      else if (id === TOR) { src.set(k, 15); if (isSolid(w.getBlock(x, y + 1, z))) strong.add(K(x, y + 1, z)); }
+      else if (id === REP && s >= 17) { const d = (s - 1) & 3, fx = x + RD[d][0], fz = z + RD[d][1]; if (isSolid(w.getBlock(fx, y, fz))) strong.add(K(fx, y, fz)); } }
+    // fio: força
+    const pw = new Map(), q = []; const wires = comps.filter(c => c[3] === W_);
+    const torchSupport = (x, y, z) => { const tw = wallTorch(w, x, y, z); return tw ? K(x + tw[0], y, z + tw[1]) : K(x, y - 1, z); };
+    for (const [x, y, z, , k] of wires) { let p = 0;
+      for (const d of N6) { const nk = K(x + d[0], y + d[1], z + d[2]); if (src.has(nk)) p = 15; else if (strong.has(nk)) p = 15; }
+      for (let i = 0; i < 4; i++) { const bx = x - RD[i][0], bz = z - RD[i][1], b = w.getBlock(bx, y, bz); if (b === REP) { const s = st(w, bx, y, bz); if (s >= 17 && ((s - 1) & 3) === i) p = 15; } }
+      if (p) { pw.set(k, p); q.push(k); } }
+    const wireAt = (x, y, z) => w.getBlock(x, y, z) === W_;
+    for (let h = 0; h < q.length; h++) { const k = q[h], [x, y, z] = P(k), p = pw.get(k) - 1; if (p <= 0) continue;
+      for (const [dx, dz] of RD) { const cand = []; if (wireAt(x + dx, y, z + dz)) cand.push([x + dx, y, z + dz]); else { if (!OPAQ[w.getBlock(x, y + 1, z)] && wireAt(x + dx, y + 1, z + dz)) cand.push([x + dx, y + 1, z + dz]); if (!OPAQ[w.getBlock(x + dx, y, z + dz)] && wireAt(x + dx, y - 1, z + dz)) cand.push([x + dx, y - 1, z + dz]); }
+        for (const c of cand) { const ck = K(...c); if ((pw.get(ck) || 0) < p) { pw.set(ck, p); q.push(ck); } } } }
+    // fio energizado energiza o bloco embaixo e o bloco para onde aponta
+    for (const [x, y, z, , k] of wires) { if (!pw.get(k)) continue; if (isSolid(w.getBlock(x, y - 1, z))) weak.add(K(x, y - 1, z)); const c = rsWireConn(w, x, y, z), none = !c[0] && !c[1] && !c[2] && !c[3];
+      for (let i = 0; i < 4; i++) if (c[i] || none) { const D = [[1, 0], [-1, 0], [0, 1], [0, -1]][i], bx = x + D[0], bz = z + D[1]; if (isSolid(w.getBlock(bx, y, bz))) weak.add(K(bx, y, bz)); } }
+    const poweredBlock = k => strong.has(k) || weak.has(k);
+    // alguma coisa liga este lugar?
+    const powered = (x, y, z, self) => { for (const d of N6) { const X = x + d[0], Y = y + d[1], Z = z + d[2], nk = K(X, Y, Z); if (nk === self) continue; if (src.has(nk)) { const b = w.getBlock(X, Y, Z); if ((b === TOR) && torchSupport(X, Y, Z) === K(x, y, z)) continue; return true; } if (poweredBlock(nk)) return true; if ((pw.get(nk) || 0) > 0 && (d[1] !== 0 || true)) return true; }
+      for (let i = 0; i < 4; i++) { const bx = x - RD[i][0], bz = z - RD[i][1]; if (w.getBlock(bx, y, bz) === REP) { const s = st(w, bx, y, bz); if (s >= 17 && ((s - 1) & 3) === i) return true; } } return false; };
+    // tochas (inversor), com proteção contra pisca-pisca muito rápido
+    for (const [x, y, z, id, k] of comps) if (id === TOR || id === TOROFF) { const sk = torchSupport(x, y, z); let want = poweredBlock(sk) ? TOROFF : TOR; if (!poweredBlock(sk)) { const [sx, sy, sz] = P(sk); if (src.has(sk)) want = TOROFF; }
+      if (burnt.has(k) && now < burnt.get(k)) want = TOROFF; if (want !== id) { const h = (torHist.get(k) || []).filter(t => now - t < 1.5); h.push(now); torHist.set(k, h); if (h.length > 10) { burnt.set(k, now + 3); want = TOROFF; Particles.spawn(x + 0.5, y + 0.7, z + 0.5, [0.4, 0.4, 0.4], 6, 0.6, 0.4, -1, 0.3); }
+        if (want !== id) { w.setBlock(x, y, z, want, { keepData: true }); changed = true; } } }
+    // repetidores: atraso de 1 a 4 "tiques" (0,1 s cada)
+    for (const [x, y, z, id, k] of comps) if (id === REP) { const s = st(w, x, y, z) || 1, d = (s - 1) & 3, dl = ((s - 1) >> 2 & 3) + 1, on = s >= 17, bx = x - RD[d][0], bz = z - RD[d][1], bk = K(bx, y, bz);
+      const inp = (pw.get(bk) || 0) > 0 || poweredBlock(bk) || src.has(bk) || (w.getBlock(bx, y, bz) === REP && st(w, bx, y, bz) >= 17 && ((st(w, bx, y, bz) - 1) & 3) === d);
+      const pend = repQ.get(k); if (inp !== on) { if (!pend || pend.v !== inp) repQ.set(k, { v: inp, t: now + dl * 0.1 }); } else if (pend) repQ.delete(k); }
+    for (const [k, p] of repQ) if (now >= p.t) { repQ.delete(k); const [x, y, z] = P(k); if (w.getBlock(x, y, z) !== REP) continue; const s = st(w, x, y, z) || 1, base = ((s - 1) & 15) + 1; w.setBlock(x, y, z, REP, { ax: base + (p.v ? 16 : 0) }); changed = true; }
+    // fio: grava a força nova (muda a cor)
+    for (const [x, y, z, , k] of wires) { const p = pw.get(k) || 0; if (st(w, x, y, z) !== p) w.setBlock(x, y, z, W_, { ax: p, noUpdate: true }); }
+    // quem recebe energia
+    for (const [x, y, z, id, k] of comps) {
+      if (id === LAMP || id === LAMPON) { const on = powered(x, y, z, k); if (on !== (id === LAMPON)) w.setBlock(x, y, z, on ? LAMPON : LAMP); }
+      else if (id === BID.tnt) { if (powered(x, y, z, k) && window.PrimedTNT) { w.setBlock(x, y, z, 0); G.entities.push(new PrimedTNT(x, y, z, 4)); } }
+      else if (id === BID.door || id === BID.door_open || id === ID || id === IDO) { const up = BL[w.getBlock(x, y - 1, z)].shape === 'door' ? y - 1 : y, bk = K(x, up, z); if (up !== y) continue;
+        const on = powered(x, y, z, k) || powered(x, y + 1, z, K(x, y + 1, z)); const was = doorMem.get(bk); if (was === on) continue; doorMem.set(bk, on); if (was === undefined && !on) continue;
+        const iron = id === ID || id === IDO, nid = on ? (iron ? IDO : BID.door_open) : (iron ? ID : BID.door), cur = w.getBlock(x, y, z); if (cur === nid) continue;
+        for (const dy of [0, 1]) if (BL[w.getBlock(x, y + dy, z)].shape === 'door') w.setBlock(x, y + dy, z, nid, { keepData: true, noUpdate: true }); Snd.play('door', 0.6); } }
+    if (changed) w.rsDirty = true;
+  }
+  const tk = G.tick; G.tick = function (dt) { const r = tk.apply(this, arguments);
+    try { const w = this.world; if (this.state === 'play' && w && !(window.NETX && NETX.isClient())) { if (!w.rsScanned) scanWorld(w); acc += dt; if (acc >= 0.1) { acc = 0; if ((w.rs && w.rs.size)) sim(w, 0.1); } } } catch (e) { console.error(e); }
+    return r; };
+  // ---------- usar: alavanca, botão, repetidor ----------
+  for (const id of [LEV, SB, WB, REP]) BL[id].interact = 'rs';
+  const ob = G.openBlock; G.openBlock = function (x, y, z, kind) {
+    if (kind !== 'rs') return ob.apply(this, arguments); const w = this.world, id = w.getBlock(x, y, z), s = st(w, x, y, z) || (id === REP ? 1 : 3); this.swing = 1;
+    if (id === LEV) { w.setBlock(x, y, z, LEV, { ax: s >= 9 ? s - 8 : s + 8 }); Snd.play('click', 0.6); }
+    else if (id === SB || id === WB) { if (s < 9) { w.setBlock(x, y, z, id, { ax: s + 8 }); Snd.play('click', 0.6); if (!(window.NETX && NETX.isClient())) btnT.set(K(x, y, z), performance.now() / 1000 + (id === WB ? 1.5 : 1.0)); } }
+    else if (id === REP) { const d = (s - 1) & 3, dl = ((s - 1) >> 2) & 3, on = s >= 17; w.setBlock(x, y, z, REP, { ax: 1 + d + 4 * ((dl + 1) & 3) + (on ? 16 : 0) }); Snd.play('click', 0.5); }
+    if (w.rs) w.rsDirty = true; };
+  // convidado aperta botão: quem solta é o dono
+  const bcH = G.blockChanged; G.blockChanged = function (x, y, z, o, n) { const r = bcH.apply(this, arguments); if ((n === SB || n === WB) && !(window.NETX && NETX.isClient())) { const w = this.world, s = st(w, x, y, z), k = K(x, y, z); if (s >= 9 && !btnT.has(k)) btnT.set(k, performance.now() / 1000 + (n === WB ? 1.5 : 1.0)); } return r; };
+  // ---------- desenho ----------
+  const RS_TINT = []; for (let p = 0; p <= 15; p++) RS_TINT[p] = [0.32 + 0.68 * p / 15, 0.03 + 0.12 * (p / 15) ** 2, 0.03];
+  const MAP = (f, a0, b0, h0, a1, b1, h1) => { const A = [a0 / 16, a1 / 16], B = [b0 / 16, b1 / 16], H = [h0 / 16, h1 / 16];
+    switch (f) { case 2: return [A[0], H[0], B[0], A[1], H[1], B[1]]; case 3: return [A[0], 1 - H[1], B[0], A[1], 1 - H[0], B[1]]; case 0: return [H[0], B[0], A[0], H[1], B[1], A[1]]; case 1: return [1 - H[1], B[0], A[0], 1 - H[0], B[1], A[1]]; case 4: return [A[0], B[0], H[0], A[1], B[1], H[1]]; default: return [A[0], B[0], 1 - H[1], A[1], B[1], 1 - H[0]]; } };
+  const tex1 = t => ({ top: t, side: t, bottom: t });
+  window.BOX_EXTRA = window.BOX_EXTRA || {};
+  BOX_EXTRA.rs_wire = (A, w, X, y, Z, x, z, s, sky, bl, id) => { emitBoxes(A, blockBoxes(id, X, y, Z, false, w), x, y, z, BL[id].tex, sky, Math.max(bl, s ? 0.4 * s / 15 : 0), null, 1, false, RS_TINT[s || 0]); return true; };
+  BOX_EXTRA.lever = (A, w, X, y, Z, x, z, s, sky, bl, id) => { const f = s ? (s - 1) & 7 : 2, on = s >= 9; emitBoxes(A, [MAP(f, 5, 4, 0, 11, 12, 3)], x, y, z, BL[id].tex, sky, bl, null);
+    emitBoxes(A, [on ? MAP(f, 7, 8.5, 3, 9, 10.5, 10) : MAP(f, 7, 5.5, 3, 9, 7.5, 10)], x, y, z, tex1(T.lever_stick), sky, bl, null); return true; };
+  BOX_EXTRA.repeater = (A, w, X, y, Z, x, z, s, sky, bl, id) => { s = s || 1; const d = (s - 1) & 3, dl = ((s - 1) >> 2 & 3) + 1, on = s >= 17;
+    emitBoxes(A, [[0, 0, 0, 1, 2 / 16, 1]], x, y, z, BL[id].tex, sky, bl, null);
+    // tochinhas: a da frente fixa, a de trás anda com o atraso
+    const along = (l0, l1) => { const a = 7 / 16, b = 9 / 16; switch (d) { case 0: return [a, 2 / 16, 1 - l1, b, 7 / 16, 1 - l0]; case 2: return [a, 2 / 16, l0, b, 7 / 16, l1]; case 1: return [l0, 2 / 16, a, l1, 7 / 16, b]; default: return [1 - l1, 2 / 16, a, 1 - l0, 7 / 16, b]; } };
+    const tint = on ? [1, 0.25, 0.18] : [0.42, 0.1, 0.08], back = 0.18 + (dl - 1) * 0.12;
+    emitBoxes(A, [along(0.72, 0.84), along(back, back + 0.12)], x, y, z, tex1(T.wool_white), sky, on ? Math.max(bl, 0.5) : bl, null, 1, false, tint); return true; };
+  // aparece na aba de redstone do criativo
+  try { if (window.CREATIVE_TABS) { } } catch (e) { }
 })();
 
 // ===== REGRAS GLOBAIS: quando uma tela está aberta (inventário, baú, chat, pausa, morte), nada acontece no mundo =====
