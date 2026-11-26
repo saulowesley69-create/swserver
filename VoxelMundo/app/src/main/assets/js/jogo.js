@@ -5492,7 +5492,7 @@ const G = {
         if (a[1] === 'kit') { this.pvpKit(); ok('Kit de PvP entregue'); break; }
         if (a[1] === 'stop' || a[1] === 'parar') { let n = 0; for (const e of this.entities) if (e instanceof Fighter) { e.remove(); n++; } ok(n + ' lutadores removidos'); break; }
         const n = clamp(parseInt(a[1]) || 1, 1, 8), tr = a[2] !== undefined ? clamp(parseInt(a[2]) || 0, 0, 3) : undefined; if (p.mode !== 'survival') err('Dica: os bots só atacam no modo Sobrevivência (/gamemode survival)'); this.startPvP(n, tr); break; }
-      case 'locate': case 'localizar': { const tp = { vila: 'village', village: 'village', masmorra: 'dungeon', dungeon: 'dungeon', navio: 'ship', ship: 'ship', shipwreck: 'ship', mansao: 'mansion', 'mansão': 'mansion', mansion: 'mansion', mina: 'mineshaft', mineshaft: 'mineshaft', fortaleza: 'fortress', fortress: 'fortress', bastiao: 'bastion', 'bastião': 'bastion', bastion: 'bastion' }[(a[1] || '').toLowerCase()]; if (!tp) return err((S.lang === 'en' ? 'Usage: ' : 'Uso: ') + '/locate <village|dungeon|shipwreck|mansion|mineshaft|fortress|bastion>'); if (NSTRUCT[tp]) { if (this.dim !== 'nether') return err(S.lang === 'en' ? 'Only works in the Abyss.' : 'Só funciona no Abismo.'); let best = null, bd = 1e18; for (const q of this.world.netherStructsNear(p.pos.x, p.pos.z, 1400, tp)) { const dd = (q.x - p.pos.x) ** 2 + (q.z - p.pos.z) ** 2; if (dd < bd) { bd = dd; best = q; } } if (!best) return err('Nada encontrado por perto.'); ok(`${NSTRUCT[tp].name} mais próxima: X ${best.x}, Y ${best.y}, Z ${best.z} — a ${Math.round(Math.sqrt(bd))} blocos`); break; } if (this.dim !== 'overworld') return err('Só funciona na Superfície.'); const s = this.world.locate(tp, p.pos.x, p.pos.z); if (s && tp === 'mineshaft') { ok(`Mina Abandonada mais próxima: X ${s.x}, Y ${s.y}, Z ${s.z} — a ${Math.round(Math.hypot(s.x - p.pos.x, s.z - p.pos.z))} blocos`); break; } if (!s) return err('Nada encontrado por perto.'); ok(`${STRUCT[tp].name} mais próxima: X ${s.x}, Z ${s.z}` + (tp === 'dungeon' ? ` (sala na altura ${s.y}, entrada pelo poço de pedra na superfície)` : '') + ` — a ${Math.round(Math.hypot(s.x - p.pos.x, s.z - p.pos.z))} blocos`); break; }
+      case 'locate': case 'localizar': { const tp = { vila: 'village', village: 'village', masmorra: 'dungeon', dungeon: 'dungeon', navio: 'ship', ship: 'ship', shipwreck: 'ship', mansao: 'mansion', 'mansão': 'mansion', mansion: 'mansion', mina: 'mineshaft', mineshaft: 'mineshaft', fortaleza: 'fortress', fortress: 'fortress', bastiao: 'bastion', 'bastião': 'bastion', bastion: 'bastion', pyramid: 'pyramid', desert_pyramid: 'pyramid', jungle_temple: 'jungle_temple', temple: 'jungle_temple', igloo: 'igloo' }[(a[1] || '').toLowerCase()]; if (!tp) return err((S.lang === 'en' ? 'Usage: ' : 'Uso: ') + '/locate <village|dungeon|shipwreck|mansion|mineshaft|fortress|bastion|pyramid|jungle_temple|igloo>'); if (NSTRUCT[tp]) { if (this.dim !== 'nether') return err(S.lang === 'en' ? 'Only works in the Abyss.' : 'Só funciona no Abismo.'); let best = null, bd = 1e18; for (const q of this.world.netherStructsNear(p.pos.x, p.pos.z, 1400, tp)) { const dd = (q.x - p.pos.x) ** 2 + (q.z - p.pos.z) ** 2; if (dd < bd) { bd = dd; best = q; } } if (!best) return err('Nada encontrado por perto.'); ok(`${NSTRUCT[tp].name} mais próxima: X ${best.x}, Y ${best.y}, Z ${best.z} — a ${Math.round(Math.sqrt(bd))} blocos`); break; } if (this.dim !== 'overworld') return err('Só funciona na Superfície.'); const s = this.world.locate(tp, p.pos.x, p.pos.z); if (s && tp === 'mineshaft') { ok(`Mina Abandonada mais próxima: X ${s.x}, Y ${s.y}, Z ${s.z} — a ${Math.round(Math.hypot(s.x - p.pos.x, s.z - p.pos.z))} blocos`); break; } if (!s) return err('Nada encontrado por perto.'); ok(`${STRUCT[tp].name} mais próxima: X ${s.x}, Z ${s.z}` + (tp === 'dungeon' ? ` (sala na altura ${s.y}, entrada pelo poço de pedra na superfície)` : '') + ` — a ${Math.round(Math.hypot(s.x - p.pos.x, s.z - p.pos.z))} blocos`); break; }
       case 'fly': if (p.mode !== 'survival') { p.flying = !p.flying; ok('Voo: ' + (p.flying ? 'ligado' : 'desligado')); } else err('Só no criativo'); break;
       default: err('Comando desconhecido. Digite /help');
     }
@@ -8639,7 +8639,7 @@ body.touch #actbtn.show{display:block}`;
     ['difficulty', '<peaceful|easy|normal|hard>', 'Muda a dificuldade', 'Change difficulty', [['peaceful', 'easy', 'normal', 'hard']]],
     ['spawnpoint', '', 'Renasce onde você está', 'Set respawn here', []],
     ['fly', '', 'Liga ou desliga o voo', 'Toggle flying', []],
-    ['locate', '<village|dungeon|shipwreck|mansion|mineshaft|fortress|bastion>', 'Mostra a estrutura mais perto', 'Find the nearest structure', [['village', 'dungeon', 'shipwreck', 'mansion', 'mineshaft', 'fortress', 'bastion']]],
+    ['locate', '<village|dungeon|shipwreck|mansion|mineshaft|fortress|bastion|pyramid|jungle_temple|igloo>', 'Mostra a estrutura mais perto', 'Find the nearest structure', [['village', 'dungeon', 'shipwreck', 'mansion', 'mineshaft', 'fortress', 'bastion', 'pyramid', 'jungle_temple', 'igloo']]],
     ['dimension', '<overworld|nether|end>', 'Vai para outra dimensão', 'Go to another dimension', [['overworld', 'nether', 'end']]],
     ['attribute', '@s <attribute> base set <value>', 'Muda um atributo (tamanho, velocidade...)', 'Change an attribute (scale, speed...)', [['@s'], () => Object.keys(typeof ATTR_DEF !== 'undefined' ? ATTR_DEF : {}), ['base'], ['set', 'get', 'reset']]],
     ['lightning', '', 'Solta um raio na sua frente', 'Strike lightning ahead', []],
@@ -8952,7 +8952,7 @@ body.chopen #touchui,body.chopen #chatlog,body.chopen #itemname,body.chopen #hot
     // quem recebe energia
     for (const [x, y, z, id, k] of comps) {
       if (id === LAMP || id === LAMPON) { const on = powered(x, y, z, k); if (on !== (id === LAMPON)) w.setBlock(x, y, z, on ? LAMPON : LAMP); }
-      else if (id === BID.tnt) { if (powered(x, y, z, k) && window.PrimedTNT) { w.setBlock(x, y, z, 0); G.entities.push(new PrimedTNT(x, y, z, 4)); } }
+      else if (id === BID.tnt) { if (powered(x, y, z, k) && typeof PrimedTNT !== 'undefined') { w.setBlock(x, y, z, 0); G.entities.push(new PrimedTNT(x, y, z, 4)); } }
       else if (id === BID.door || id === BID.door_open || id === ID || id === IDO) { const up = BL[w.getBlock(x, y - 1, z)].shape === 'door' ? y - 1 : y, bk = K(x, up, z); if (up !== y) continue;
         const on = powered(x, y, z, k) || powered(x, y + 1, z, K(x, y + 1, z)); const was = doorMem.get(bk); if (was === on) continue; doorMem.set(bk, on); if (was === undefined && !on) continue;
         const iron = id === ID || id === IDO, nid = on ? (iron ? IDO : BID.door_open) : (iron ? ID : BID.door), cur = w.getBlock(x, y, z); if (cur === nid) continue;
@@ -9411,6 +9411,152 @@ body.chopen #touchui,body.chopen #chatlog,body.chopen #itemname,body.chopen #hot
     if (o === LO && n !== LO && w.getBlock(x, y + 1, z) === HI) w.setBlock(x, y + 1, z, 0);
     if (o === HI && n !== HI && w.getBlock(x, y - 1, z) === LO) w.setBlock(x, y - 1, z, 0);
     return r; };
+})();
+
+// ================= ETAPA 3: Pirâmide do deserto, Templo da selva, Iglu + raridade parecida com a do Minecraft =================
+// Espaçamento: no Minecraft pirâmide/templo/iglu usam grade de 32 chunks (512 blocos) e só nascem no bioma certo.
+// Navio naufragado: grade de 24 chunks (384 blocos).
+(function () {
+  STRUCT.ship.cell = 384; STRUCT.ship.chance = 0.7;
+  const NEW = { pyramid: { cell: 512, chance: 0.9, name: 'Pirâmide do Deserto', en: 'Desert Pyramid', biomes: [BIOME.DESERT] },
+    jungle_temple: { cell: 512, chance: 0.9, name: 'Templo da Selva', en: 'Jungle Temple', biomes: [BIOME.JUNGLE] },
+    igloo: { cell: 512, chance: 0.9, name: 'Iglu', en: 'Igloo', biomes: [BIOME.SNOW] } };
+  for (const k in NEW) STRUCT[k] = NEW[k];
+  window.TEMPLE_TYPES = NEW;
+  const SIZE = { pyramid: 11, jungle_temple: 9, igloo: 5 };
+  const sAt = World.prototype.structAt;
+  World.prototype.structAt = function (type, cx, cz) {
+    if (!NEW[type]) return sAt.call(this, type, cx, cz);
+    if (this.wtype && this.wtype !== 'normal') return null;
+    const sc = this.sc || (this.sc = new Map()), k = type + cx + ',' + cz; if (sc.has(k)) return sc.get(k);
+    const C = STRUCT[type], r = mulberry32((hashStr(type) ^ Math.imul(cx, 92821) ^ Math.imul(cz, 68917) ^ this.seed) >>> 0); let res = null;
+    if (this.dim === 'overworld' && r() < C.chance) {
+      const m = 60, x = cx * C.cell + m + Math.floor(r() * (C.cell - 2 * m)), z = cz * C.cell + m + Math.floor(r() * (C.cell - 2 * m)), h = this.heightAt(x, z), b = this.biomeAt(x, z, h), seed = (r() * 1e9) | 0;
+      if (C.biomes.includes(b) && h > SEA + 1) { const R = SIZE[type]; let ok = true, lo = h, hi = h, miss = 0;
+        for (const [ox, oz] of [[-R, -R], [R, -R], [-R, R], [R, R], [0, R], [0, -R], [R, 0], [-R, 0]]) { const hh = this.heightAt(x + ox, z + oz), hm = this.heightAt(x + (ox >> 1), z + (oz >> 1)); lo = Math.min(lo, hm); hi = Math.max(hi, hm); if (hh <= SEA) ok = false; if (!C.biomes.includes(this.biomeAt(x + ox, z + oz, hh))) miss++; }
+        if (miss > 4) ok = false;
+        if (ok && hi - lo <= (type === 'pyramid' ? 14 : 9)) res = { type, x, z, y: type === 'pyramid' ? Math.round((lo + h) / 2) : h, seed, basement: r() < 0.5 }; }
+    }
+    sc.set(k, res); return res;
+  };
+  // ---------- Pirâmide do deserto: 4 baús no porão secreto, placa de pressão em cima de 9 TNT ----------
+  function buildPyramid(w, s, put) {
+    const X0 = s.x, Z0 = s.z, y0 = s.y, SS = BID.sandstone, OR = BID.terracotta_orange, YE = BID.terracotta_yellow, CUT = BID.sandstone_slab;
+    for (let x = -12; x <= 12; x++) for (let z = -12; z <= 12; z++) { const m = Math.max(Math.abs(x), Math.abs(z)), X = X0 + x, Z = Z0 + z;
+      if (m <= 10) { const gh = w.heightAt(X, Z); for (let y = Math.min(y0 - 4, gh - 1); y <= y0; y++) put(X, y, Z, SS); }
+      if (m <= 11) for (let y = y0 + 1; y <= y0 + 16; y++) put(X, y, Z, 0);
+      if (m > 10) continue;
+      const top = 10 - m; for (let y = y0 + 1; y <= y0 + top; y++) put(X, y, Z, (y - y0 === top && (top === 3 || top === 6)) ? OR : SS);
+      // salão oco por dentro
+      if (m <= 7) for (let y = y0 + 1; y <= y0 + Math.min(top - 1, 7); y++) put(X, y, Z, 0);
+      // desenho no chão: losango laranja com centro amarelo
+      const dm = Math.abs(x) + Math.abs(z); if (m <= 7) put(X, y0, Z, dm === 0 ? YE : (dm === 2 || dm === 4) ? OR : SS);
+    }
+    // torres nos cantos da frente
+    for (const sx of [-1, 1]) for (let x = 0; x < 5; x++) for (let z = 0; z < 5; z++) { const X = X0 + sx * (6 + x), Z = Z0 + 6 + z, edge = x === 0 || x === 4 || z === 0 || z === 4;
+      for (let y = y0 + 1; y <= y0 + 12; y++) put(X, y, Z, edge || y === y0 + 12 ? ((y === y0 + 9 && edge) ? OR : SS) : 0);
+      if (edge && (x === 2 || z === 2)) put(X, y0 + 10, Z, 0); }
+    // entrada na frente (+z), com degraus
+    for (let z = 7; z <= 12; z++) for (let x = -1; x <= 1; x++) for (let y = y0 + 1; y <= y0 + 3; y++) put(X0 + x, y, Z0 + z, 0);
+    for (let x = -1; x <= 1; x++) { put(X0 + x, y0, Z0 + 11, SS); put(X0 + x, y0, Z0 + 12, CUT); }
+    for (const sx of [-2, 2]) for (let y = y0 + 1; y <= y0 + 4; y++) put(X0 + sx, y, Z0 + 10, y === y0 + 3 ? OR : SS);
+    // tochas no salão
+    for (const [tx, tz] of [[-6, -6], [6, -6], [-6, 6], [6, 6]]) { put(X0 + tx, y0 + 1, Z0 + tz, SS); put(X0 + tx, y0 + 2, Z0 + tz, BID.torch); }
+    // porão secreto: o bloco amarelo do centro esconde um poço até a sala dos tesouros
+    const yR = y0 - 13;
+    for (let x = -4; x <= 4; x++) for (let z = -4; z <= 4; z++) for (let y = yR - 2; y <= yR + 4; y++) put(X0 + x, y, Z0 + z, SS);
+    for (let x = -2; x <= 2; x++) for (let z = -2; z <= 2; z++) for (let y = yR + 1; y <= yR + 3; y++) put(X0 + x, y, Z0 + z, 0);
+    for (let y = yR + 4; y < y0; y++) put(X0, y, Z0, 0);
+    for (const [dx, dz] of [[0, -3], [0, 3], [-3, 0], [3, 0]]) { for (let y = yR + 1; y <= yR + 2; y++) put(X0 + dx, y, Z0 + dz, 0); put(X0 + dx, yR + 3, Z0 + dz, OR); }
+    put(X0, yR + 1, Z0 - 3, BID.chest, { loot: 'pyramid', f: 3 }); put(X0, yR + 1, Z0 + 3, BID.chest, { loot: 'pyramid', f: 2 });
+    put(X0 - 3, yR + 1, Z0, BID.chest, { loot: 'pyramid', f: 5 }); put(X0 + 3, yR + 1, Z0, BID.chest, { loot: 'pyramid', f: 4 });
+    for (let x = -1; x <= 1; x++) for (let z = -1; z <= 1; z++) put(X0 + x, yR - 1, Z0 + z, BID.tnt);
+    put(X0, yR, Z0, BID.tnt); put(X0, yR + 1, Z0, BID.stone_plate);
+    for (const [dx, dz] of [[-2, -2], [2, -2], [-2, 2], [2, 2]]) put(X0 + dx, yR, Z0 + dz, OR);
+  }
+  // ---------- Templo da selva: 3 alavancas, a combinação certa abre a parede secreta ----------
+  function buildJungle(w, s, put) {
+    const X0 = s.x, Z0 = s.z, y0 = s.y, r = mulberry32(s.seed);
+    const mat = (x, y, z) => { const k = hash3(x, y, z, s.seed); return k < 0.45 ? BID.mossy_cobble : k < 0.8 ? BID.cobble : BID.stone_bricks; };
+    for (let x = -9; x <= 9; x++) for (let z = -9; z <= 9; z++) for (let y = y0 + 1; y <= y0 + 14; y++) put(X0 + x, y, Z0 + z, 0);
+    // corpo: térreo, 2º andar e porão
+    for (let x = -6; x <= 6; x++) for (let z = -7; z <= 7; z++) { const X = X0 + x, Z = Z0 + z, edge = Math.abs(x) === 6 || Math.abs(z) === 7;
+      for (let y = y0 - 6; y <= y0 + 5; y++) { const inB = !edge && y >= y0 - 4 && y <= y0 - 2, in1 = !edge && y >= y0 + 1 && y <= y0 + 4; put(X, y, Z, inB || in1 ? 0 : mat(X, y, Z)); } }
+    for (let x = -4; x <= 4; x++) for (let z = -5; z <= 5; z++) { const X = X0 + x, Z = Z0 + z, edge = Math.abs(x) === 4 || Math.abs(z) === 5;
+      for (let y = y0 + 6; y <= y0 + 9; y++) put(X, y, Z, (!edge && y <= y0 + 8) ? 0 : mat(X, y, Z)); }
+    for (let x = -2; x <= 2; x++) for (let z = -3; z <= 3; z++) put(X0 + x, y0 + 10, Z0 + z, mat(X0 + x, y0 + 10, Z0 + z));
+    // janelas, entrada e escada para o 2º andar
+    for (const z of [-4, 0, 4]) for (const sx of [-6, 6]) put(X0 + sx, y0 + 3, Z0 + z, 0);
+    for (let x = -1; x <= 1; x++) for (let y = y0 + 1; y <= y0 + 3; y++) put(X0 + x, y, Z0 + 7, 0);
+    for (let x = -1; x <= 1; x++) { put(X0 + x, y0, Z0 + 8, BID.cobble_stairs); put(X0 + x, y0 - 1, Z0 + 8, BID.cobble); }
+    for (let y = y0 + 1; y <= y0 + 5; y++) put(X0 - 5, y, Z0 - 6, BID.ladder, { door: true, f: 3 });
+    put(X0 - 5, y0 + 5, Z0 - 6, 0);
+    for (const [tx, tz] of [[-5, 6], [5, 6], [5, -6]]) put(X0 + tx, y0 + 2, Z0 + tz, BID.torch);
+    // descida para o porão
+    put(X0 + 5, y0, Z0 + 5, 0); put(X0 + 5, y0 - 1, Z0 + 5, 0);
+    for (let y = y0 - 4; y <= y0; y++) put(X0 + 5, y, Z0 + 5, BID.ladder, { door: true, f: 0 });
+    // alavancas na parede norte do porão; em cima de cada uma, a pista: pedra brilhante = puxe, tijolo = deixe
+    const codes = [[1, 0, 1], [1, 1, 0], [0, 1, 1], [1, 0, 0], [0, 0, 1], [0, 1, 0], [1, 1, 1]], code = codes[r() * codes.length | 0], yL = y0 - 3, lev = [];
+    for (let i = 0; i < 3; i++) { const lx = X0 - 2 + i * 2, lz = Z0 - 6; put(lx, yL, lz, BID.lever, null, 5); put(lx, yL + 1, lz - 1, code[i] ? BID.glowstone : BID.stone_bricks); lev.push([lx, yL, lz]); }
+    // parede secreta (oeste) e a sala do tesouro atrás dela
+    const wall = [[X0 - 6, y0 - 4, Z0], [X0 - 6, y0 - 3, Z0]];
+    for (let x = -10; x <= -7; x++) for (let z = -2; z <= 2; z++) for (let y = y0 - 5; y <= y0 - 1; y++) { const X = X0 + x, Z = Z0 + z, edge = x === -10 || Math.abs(z) === 2 || y === y0 - 5 || y === y0 - 1; put(X, y, Z, edge ? mat(X, y, Z) : 0); }
+    put(X0 - 9, y0 - 4, Z0, BID.chest, { loot: 'jungle', f: 5 }); put(X0 - 9, y0 - 3, Z0 - 1, BID.torch);
+    const pk = 'jtp:' + X0 + ',' + Z0; if (!w.bdata[pk]) w.bdata[pk] = { lev, code, wall, done: 0 };
+    // segundo baú: corredor com teias e uma armadilha de TNT na placa
+    put(X0 + 4, y0 - 4, Z0 - 5, BID.chest, { loot: 'jungle', f: 3 });
+    for (let z = -4; z <= -2; z++) put(X0 + 4, y0 - 3, Z0 + z, BID.cobweb);
+    put(X0 + 4, y0 - 4, Z0 - 3, BID.stone_plate); put(X0 + 4, y0 - 5, Z0 - 3, BID.tnt);
+    // cipós e folhas em volta (fica com cara de abandonado)
+    for (let x = -7; x <= 7; x++) for (let z = -8; z <= 8; z++) { const X = X0 + x, Z = Z0 + z; if (Math.abs(x) <= 6 && Math.abs(z) <= 7) continue; if (hash3(X, y0, Z, s.seed) < 0.18) { put(X, y0 + 1, Z, BID.jungle_leaves); if (hash3(X, y0 + 1, Z, s.seed) < 0.4) put(X, y0 + 2, Z, BID.jungle_leaves); } }
+  }
+  // ---------- Iglu: cúpula de neve; metade tem porão secreto embaixo do tapete ----------
+  function buildIgloo(w, s, put) {
+    const X0 = s.x, Z0 = s.z, y0 = s.y, SN = BID.snow;
+    for (let x = -5; x <= 5; x++) for (let z = -5; z <= 6; z++) { const X = X0 + x, Z = Z0 + z; if (x * x + z * z <= 26 || (Math.abs(x) <= 1 && z > 0)) for (let y = y0 + 1; y <= y0 + 6; y++) put(X, y, Z, 0); if (x * x + z * z <= 22) for (let y = y0 - 2; y <= y0; y++) put(X, y, Z, SN); }
+    for (let x = -4; x <= 4; x++) for (let z = -4; z <= 4; z++) for (let y = 1; y <= 5; y++) { const d = (x * x + z * z) / 16 + ((y - 0.5) * (y - 0.5)) / 18; if (d <= 1 && d > 0.62) put(X0 + x, y0 + y, Z0 + z, SN); }
+    // túnel de entrada (+z)
+    for (let z = 3; z <= 5; z++) for (let x = -1; x <= 1; x++) for (let y = 1; y <= 3; y++) { const edge = Math.abs(x) === 1 || y === 3; put(X0 + x, y0 + y, Z0 + z, edge && z > 3 ? SN : 0); }
+    for (let x = -1; x <= 1; x++) put(X0 + x, y0, Z0 + 5, SN);
+    put(X0 - 4, y0 + 2, Z0, BID.ice); put(X0 + 4, y0 + 2, Z0, BID.ice);
+    // mobília: cama, fornalha, bancada, tocha
+    put(X0 + 2, y0 + 1, Z0 - 2, BID.bed, { bed: true, f: 0 }); put(X0 + 1, y0 + 1, Z0 - 2, BID.bed_foot, { bed: true, f: 0 });
+    put(X0 - 2, y0 + 1, Z0 - 2, BID.furnace); put(X0 - 3, y0 + 1, Z0 - 1, BID.crafting_table); put(X0 - 2, y0 + 1, Z0 + 1, BID.redstone_torch);
+    for (let x = -1; x <= 1; x++) for (let z = -1; z <= 1; z++) put(X0 + x, y0, Z0 + z, BID.wool_white);
+    if (!s.basement) return;
+    // porão: escada embaixo do "tapete" de lã branca
+    const yB = y0 - 9; put(X0, y0, Z0, BID.wool_white);
+    for (let y = yB + 1; y < y0; y++) { put(X0, y, Z0, BID.ladder, { door: true, f: 3 }); put(X0, y, Z0 - 1, BID.stone_bricks); put(X0 + 1, y, Z0, BID.stone_bricks); put(X0 - 1, y, Z0, BID.stone_bricks); put(X0, y, Z0 + 1, BID.stone_bricks); }
+    for (let x = -3; x <= 3; x++) for (let z = 1; z <= 8; z++) for (let y = yB; y <= yB + 4; y++) { const edge = Math.abs(x) === 3 || z === 1 || z === 8 || y === yB || y === yB + 4; put(X0 + x, y, Z0 + z, edge ? (hash3(x, y, z, s.seed) < 0.3 ? BID.mossy_cobble : BID.stone_bricks) : 0); }
+    for (let y = yB + 1; y <= yB + 3; y++) put(X0, y, Z0 + 1, y === yB + 3 ? BID.stone_bricks : 0);
+    for (let y = yB + 1; y < y0; y++) put(X0, y, Z0, BID.ladder, { door: true, f: 3 });
+    // duas celas com grade, teias e baú do tesouro (sempre tem maçã dourada)
+    for (const sx of [-1, 1]) { for (let z = 5; z <= 7; z++) for (let y = yB + 1; y <= yB + 2; y++) put(X0 + sx * 1, y, Z0 + z, z === 6 && y === yB + 1 ? 0 : BID.fence); put(X0 + sx * 2, yB + 1, Z0 + 7, BID.cobweb); }
+    put(X0, yB + 1, Z0 + 7, BID.chest, { loot: 'igloo', f: 2 }); put(X0 + 2, yB + 1, Z0 + 2, BID.torch); put(X0 - 2, yB + 1, Z0 + 2, BID.crafting_table);
+  }
+  const BUILD = { pyramid: buildPyramid, jungle_temple: buildJungle, igloo: buildIgloo };
+  const gs = World.prototype.genStructures;
+  World.prototype.genStructures = function (c) {
+    const keep = {}; for (const k in NEW) { keep[k] = STRUCT[k]; delete STRUCT[k]; } gs.call(this, c); for (const k in keep) STRUCT[k] = keep[k];
+    if (this.dim !== 'overworld') return; const bx = c.cx * 16, bz = c.cz * 16, d = c.data; let list = [];
+    for (const k in NEW) list = list.concat(this.structsNear(bx + 8, bz + 8, 30, k)); if (!list.length) return; if (!c._chests) c._chests = [];
+    const put = (x, y, z, id, meta, ax) => { const lx = x - bx, lz = z - bz; if (lx < 0 || lx > 15 || lz < 0 || lz > 15 || y < 1 || y >= WH) return; const i = (y * 16 + lz) * 16 + lx; d[i] = id; if (c.ax) c.ax.delete(i); if (ax) (c.ax || (c.ax = new Map())).set(i, ax); if (id === BID.tnt) (this.rs || (this.rs = new Set())).add(x + ',' + y + ',' + z); if (meta) c._chests.push([x, y, z, meta]); };
+    for (const s of list) BUILD[s.type](this, s, put);
+  };
+  // ---------- quebra-cabeça do templo (só o anfitrião decide; a parede some para todos) ----------
+  let acc = 0;
+  const sp = G.spawnTick; G.spawnTick = function (dt) { const r = sp.apply(this, arguments); acc += dt; if (acc < 0.4) return r; acc = 0;
+    const w = this.world; if (!w || w.dim !== 'overworld' || this.state !== 'play' || (window.NET && NET.role === 'client')) return r;
+    for (const k in w.bdata) { if (!k.startsWith('jtp:')) continue; const P = w.bdata[k]; if (P.done) continue; const [lx, , lz] = P.lev[0]; if (!w.chunks.has(ckey(lx >> 4, lz >> 4))) continue;
+      const on = P.lev.map(([x, y, z]) => w.getBlock(x, y, z) === BID.lever && w.getAxis(x, y, z) >= 9 ? 1 : 0);
+      if (on.every((v, i) => v === P.code[i])) { P.done = 1; for (const [x, y, z] of P.wall) w.setBlock(x, y, z, 0); const [wx, wy, wz] = P.wall[0]; Particles.spawn(wx + 0.5, wy + 1, wz + 0.5, [0.6, 0.6, 0.5], 24, 2.5, 0.8, -1, 0.6); Snd.play('dig_stone', 0.9); UI.toast(S.lang === 'en' ? 'Something opened in the temple...' : 'Algo se abriu no templo...'); } }
+    return r; };
+  // ---------- tesouros ----------
+  if (window.LOOT_TABLES) Object.assign(LOOT_TABLES, {
+    pyramid: [['bone', 3, 7, 0.7], ['rotten_flesh', 3, 7, 0.6], ['gunpowder', 1, 5, 0.5], ['sand', 2, 8, 0.4], ['string', 1, 6, 0.4], ['gold_ingot', 2, 6, 0.35], ['iron_ingot', 1, 5, 0.35], ['emerald', 1, 3, 0.3], ['saddle', 1, 1, 0.2], ['BOOK', 1, 1, 0.2], ['golden_apple', 1, 1, 0.15], ['diamond', 1, 2, 0.07], ['enchanted_golden_apple', 1, 1, 0.02]],
+    jungle: [['bone', 3, 7, 0.6], ['rotten_flesh', 3, 7, 0.6], ['gold_ingot', 2, 6, 0.4], ['iron_ingot', 1, 5, 0.35], ['emerald', 1, 3, 0.3], ['arrow', 4, 12, 0.3], ['saddle', 1, 1, 0.15], ['BOOK', 1, 1, 0.2], ['diamond', 1, 2, 0.08]],
+    igloo: [['golden_apple', 1, 1, 1], ['apple', 1, 3, 0.6], ['coal', 1, 4, 0.5], ['gold_nugget', 1, 3, 0.5], ['wheat', 2, 3, 0.4], ['rotten_flesh', 1, 2, 0.3], ['stone_axe', 1, 1, 0.3], ['emerald', 1, 1, 0.25]]
+  });
 })();
 
 // ================= TEMPESTADE COM TROVÕES: céu escuro, raios, clarão, trovão, fogo =================

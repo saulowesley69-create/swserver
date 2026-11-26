@@ -11,8 +11,8 @@ android {
         applicationId 'com.swgames.voxelmundo'
         minSdk 24
         targetSdk 34
-        versionCode 30
-        versionName '3.0'
+        versionCode 31
+        versionName '3.1'
     }
 
     // Chave fixa: cada APK novo instala por cima do antigo, sem perder os mundos.
